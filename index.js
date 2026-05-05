@@ -11,12 +11,8 @@ class CHyperschema extends Hyperschema {
     return generateC(this)
   }
 
-  static toDisk (hyperschema, dir, opts) {
-    if (typeof dir === 'object' && dir) {
-      opts = dir
-      dir = null
-    }
-
+  static toDisk (hyperschema, dir) {
+    if (typeof dir === 'object' && dir) dir = null
     if (!dir) dir = hyperschema.dir
 
     hyperschema.linkAll()
@@ -24,14 +20,15 @@ class CHyperschema extends Hyperschema {
     const root = path.resolve(dir)
     fs.mkdirSync(root, { recursive: true })
 
+    const { header, source } = hyperschema.toCode()
+
     fs.writeFileSync(
       path.join(root, 'schema.json'),
       JSON.stringify(hyperschema.toJSON(), null, 2) + '\n',
       { encoding: 'utf-8' }
     )
-    fs.writeFileSync(path.join(root, 'schema.h'), hyperschema.toCode(opts), {
-      encoding: 'utf-8'
-    })
+    fs.writeFileSync(path.join(root, 'schema.h'), header, { encoding: 'utf-8' })
+    fs.writeFileSync(path.join(root, 'schema.c'), source, { encoding: 'utf-8' })
   }
 }
 
