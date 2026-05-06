@@ -1,12 +1,14 @@
-'use strict'
-
+const path = require('path')
 const test = require('brittle')
 const CHyperschema = require('.')
 
+const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/package')), 'fixtures')
+
 test('required uint only - header', (t) => {
-  const schema = CHyperschema.from('../hyperschema-fixtures/fixtures/27')
+  const schema = CHyperschema.from(path.join(fixturesDir, '27'))
   const { header } = schema.toCode()
 
+  t.ok(header.includes('#ifndef NS27_SCHEMA_H'), 'namespaced include guard')
   t.ok(header.includes('typedef struct ns27_counter_s {'), 'struct typedef')
   t.ok(header.includes('uintmax_t value;'), 'uint field')
   t.ok(!header.includes('bool has_'), 'no has_ for required fields')
@@ -16,7 +18,7 @@ test('required uint only - header', (t) => {
 })
 
 test('required uint only - source', (t) => {
-  const schema = CHyperschema.from('../hyperschema-fixtures/fixtures/27')
+  const schema = CHyperschema.from(path.join(fixturesDir, '27'))
   const { source } = schema.toCode()
 
   t.ok(source.includes('#include "schema.h"'), 'includes schema.h')
@@ -39,14 +41,17 @@ test('optional uint - has_ and flags', (t) => {
   const { header, source } = schema.toCode()
 
   t.ok(header.includes('bool has_count;'), 'has_ field in struct')
-  t.ok(source.includes('uint8_t flags = 0;'), 'flags variable in encode')
-  t.ok(source.includes('flags |= (1u << 0)'), 'flag bit set for count')
-  t.ok(source.includes('result->has_count = (flags & (1u << 0)) != 0'), 'flag bit read in decode')
+  t.ok(source.includes('uintmax_t flags = 0;'), 'flags variable in encode')
+  t.ok(source.includes('flags |= ((uintmax_t)1 << 0)'), 'flag bit set for count')
+  t.ok(
+    source.includes('result->has_count = (flags & ((uintmax_t)1 << 0)) != 0'),
+    'flag bit read in decode'
+  )
   t.ok(source.includes('if (value->has_count)'), 'conditional encode')
   t.ok(source.includes('if (result->has_count)'), 'conditional decode')
 })
 
 test('unsupported type throws', (t) => {
-  const schema = CHyperschema.from('../hyperschema-fixtures/fixtures/1')
+  const schema = CHyperschema.from(path.join(fixturesDir, '1'))
   t.exception(() => schema.toCode(), /only uint is supported/)
 })

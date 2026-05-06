@@ -2,17 +2,23 @@
   "name": "hyperschema-c",
   "version": "0.1.0",
   "description": "C code generation for Hyperschema",
+  "main": "index.js",
   "exports": {
     "./package": "./package.json",
-    ".": "./index.js"
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
   },
   "files": [
     "lib",
-    "index.js"
+    "index.js",
+    "index.d.ts",
+    "package.json"
   ],
   "scripts": {
-    "format": "prettier . --write",
-    "lint": "prettier . --check",
+    "format": "prettier . --write && lunte --fix",
+    "lint": "prettier . --check && lunte",
     "test": "brittle-node test.js"
   },
   "repository": {
@@ -26,6 +32,8 @@
   },
   "devDependencies": {
     "brittle": "^3.7.0",
+    "hyperschema-test": "^1.0.0",
+    "lunte": "^1.8.0",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0",
     "test-tmp": "^1.3.0"
