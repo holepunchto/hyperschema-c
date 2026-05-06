@@ -1,10 +1,16 @@
 "use strict";
 
+const path = require("path");
 const test = require("brittle");
 const CHyperschema = require(".");
 
+const fixturesDir = path.join(
+  path.dirname(require.resolve("hyperschema-test/package")),
+  "fixtures",
+);
+
 test("required uint only - header", (t) => {
-  const schema = CHyperschema.from("../hyperschema-fixtures/fixtures/27");
+  const schema = CHyperschema.from(path.join(fixturesDir, "27"));
   const { header } = schema.toCode();
 
   t.ok(header.includes("#ifndef NS27_SCHEMA_H"), "namespaced include guard");
@@ -17,7 +23,7 @@ test("required uint only - header", (t) => {
 });
 
 test("required uint only - source", (t) => {
-  const schema = CHyperschema.from("../hyperschema-fixtures/fixtures/27");
+  const schema = CHyperschema.from(path.join(fixturesDir, "27"));
   const { source } = schema.toCode();
 
   t.ok(source.includes('#include "schema.h"'), "includes schema.h");
@@ -60,6 +66,6 @@ test("optional uint - has_ and flags", (t) => {
 });
 
 test("unsupported type throws", (t) => {
-  const schema = CHyperschema.from("../hyperschema-fixtures/fixtures/1");
+  const schema = CHyperschema.from(path.join(fixturesDir, "1"));
   t.exception(() => schema.toCode(), /only uint is supported/);
 });
