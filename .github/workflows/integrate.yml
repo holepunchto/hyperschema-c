@@ -6,6 +6,8 @@ on:
   pull_request:
     branches:
       - main
+permissions:
+  contents: read
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -26,6 +28,5 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: Test / ${{ matrix.platform }}
     steps:
-      - uses: holepunchto/actions/node-base@v1
-      - run: npm install
+      - uses: holepunchto/actions/bare-base@v1
       - run: npm test
