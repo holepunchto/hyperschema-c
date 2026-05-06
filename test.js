@@ -1,5 +1,3 @@
-'use strict'
-
 const path = require('path')
 const test = require('brittle')
 const CHyperschema = require('.')
