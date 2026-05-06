@@ -1,15 +1,20 @@
 const { spawnSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
-const CHyperschema = require('../../index.js')
 const { toCName, structName } = require('../../lib/codegen')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
 const BARE_MAKE = path.join(WORKSPACE, 'node_modules', '.bin', 'bare-make')
 const TIMEOUT = 120000
 
-function runC(hyperschema, mainC) {
-  CHyperschema.toDisk(hyperschema, WORKSPACE)
+function runC(hyperschema, mainC, code) {
+  fs.writeFileSync(
+    path.join(WORKSPACE, 'schema.json'),
+    JSON.stringify(hyperschema.toJSON(), null, 2) + '\n',
+    { encoding: 'utf-8' }
+  )
+  fs.writeFileSync(path.join(WORKSPACE, 'schema.h'), code.header, { encoding: 'utf-8' })
+  fs.writeFileSync(path.join(WORKSPACE, 'schema.c'), code.source, { encoding: 'utf-8' })
   fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
 
   const shell = process.platform === 'win32'
@@ -56,6 +61,10 @@ function runC(hyperschema, mainC) {
     stdout: run.stdout || '',
     stderr: run.stderr || ''
   }
+}
+
+function primaryType(schema) {
+  return [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
 }
 
 function generateRoundTrip(name, type, testValue) {
@@ -107,7 +116,7 @@ function generateRoundTrip(name, type, testValue) {
 function generateMainC(schema, fixtureDir) {
   const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
 
-  const type = [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
+  const type = primaryType(schema)
   const name = structName(type)
 
   const lines = [
@@ -132,4 +141,4 @@ function generateMainC(schema, fixtureDir) {
   return lines.join('\n')
 }
 
-module.exports = { runC, generateMainC }
+module.exports = { runC, generateMainC, primaryType }

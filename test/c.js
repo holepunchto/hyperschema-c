@@ -2,7 +2,7 @@ const path = require('path')
 const fs = require('fs')
 const test = require('brittle')
 const CHyperschema = require('..')
-const { runC, generateMainC } = require('./helpers/c')
+const { runC, generateMainC, primaryType } = require('./helpers/c')
 
 const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/package')), 'fixtures')
 
@@ -20,19 +20,18 @@ const fixtures = fs
 for (const fix of fixtures) {
   const fixtureDir = path.join(fixturesDir, fix)
 
-  let schema
+  let schema, code
   try {
     schema = CHyperschema.from(fixtureDir)
-    schema.toCode()
+    code = schema.toCode()
   } catch {
     continue
   }
 
-  const type = [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
-  if (!type) continue
+  if (!primaryType(schema)) continue
 
   test(`fixture ${fix} - compile and round-trip`, (t) => {
-    const result = runC(schema, generateMainC(schema, fixtureDir))
+    const result = runC(schema, generateMainC(schema, fixtureDir), code)
     t.ok(result.ok, `compile/run failed:\n${result.stderr}`)
   })
 }
