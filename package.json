@@ -25,7 +25,7 @@
     "type": "git",
     "url": "git+https://github.com/holepunchto/hyperschema-c.git"
   },
-  "author": "Holepunch Inc",
+  "author": "Holepunch",
   "license": "Apache-2.0",
   "dependencies": {
     "hyperschema": "^1.20.1"
