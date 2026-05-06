@@ -16,6 +16,16 @@
     "index.d.ts",
     "package.json"
   ],
+  "imports": {
+    "fs": {
+      "bare": "bare-fs",
+      "default": "fs"
+    },
+    "path": {
+      "bare": "bare-path",
+      "default": "path"
+    }
+  },
   "scripts": {
     "format": "prettier . --write && lunte --fix",
     "lint": "prettier . --check && lunte",
@@ -30,9 +40,11 @@
   "author": "Holepunch",
   "license": "Apache-2.0",
   "dependencies": {
+    "bare-fs": "^4.7.1",
     "hyperschema": "^1.20.1"
   },
   "devDependencies": {
+    "bare-path": "^3.0.0",
     "brittle": "^3.7.0",
     "hyperschema-test": "^1.0.0",
     "lunte": "^1.8.0",
