@@ -12,24 +12,31 @@ function runC(hyperschema, mainC) {
   CHyperschema.toDisk(hyperschema, WORKSPACE)
   fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
 
+  const shell = process.platform === 'win32'
+
   const generate = spawnSync(BARE_MAKE, ['generate'], {
     cwd: WORKSPACE,
     encoding: 'utf8',
-    timeout: TIMEOUT
+    timeout: TIMEOUT,
+    shell
   })
 
-  if (generate.status !== 0) {
-    return { ok: false, stderr: generate.stderr + generate.stdout }
+  if (generate.error || generate.status !== 0) {
+    return {
+      ok: false,
+      stderr: generate.error ? generate.error.message : generate.stderr + generate.stdout
+    }
   }
 
   const build = spawnSync(BARE_MAKE, ['build'], {
     cwd: WORKSPACE,
     encoding: 'utf8',
-    timeout: TIMEOUT
+    timeout: TIMEOUT,
+    shell
   })
 
-  if (build.status !== 0) {
-    return { ok: false, stderr: build.stderr + build.stdout }
+  if (build.error || build.status !== 0) {
+    return { ok: false, stderr: build.error ? build.error.message : build.stderr + build.stdout }
   }
 
   const exe = path.join(
@@ -39,6 +46,10 @@ function runC(hyperschema, mainC) {
   )
 
   const run = spawnSync(exe, [], { encoding: 'utf8', timeout: 10000 })
+
+  if (run.error) {
+    return { ok: false, stderr: run.error.message }
+  }
 
   return {
     ok: run.status === 0,
