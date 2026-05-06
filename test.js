@@ -42,8 +42,11 @@ test('optional uint - has_ and flags', (t) => {
 
   t.ok(header.includes('bool has_count;'), 'has_ field in struct')
   t.ok(source.includes('uintmax_t flags = 0;'), 'flags variable in encode')
-  t.ok(source.includes('flags |= (1u << 0)'), 'flag bit set for count')
-  t.ok(source.includes('result->has_count = (flags & (1u << 0)) != 0'), 'flag bit read in decode')
+  t.ok(source.includes('flags |= ((uintmax_t)1 << 0)'), 'flag bit set for count')
+  t.ok(
+    source.includes('result->has_count = (flags & ((uintmax_t)1 << 0)) != 0'),
+    'flag bit read in decode'
+  )
   t.ok(source.includes('if (value->has_count)'), 'conditional encode')
   t.ok(source.includes('if (result->has_count)'), 'conditional decode')
 })
