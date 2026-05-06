@@ -17,7 +17,7 @@
     "package.json"
   ],
   "scripts": {
-    "format": "prettier . --write",
+    "format": "prettier . --write && lunte --fix",
     "lint": "prettier . --check && lunte",
     "test": "brittle-node test.js"
   },
