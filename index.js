@@ -13,8 +13,6 @@ class CHyperschema extends Hyperschema {
     if (typeof dir === 'object' && dir) dir = null
     if (!dir) dir = hyperschema.dir
 
-    hyperschema.linkAll()
-
     const root = path.resolve(dir)
     fs.mkdirSync(root, { recursive: true })
 
