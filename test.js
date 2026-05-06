@@ -7,6 +7,7 @@ test('required uint only - header', (t) => {
   const schema = CHyperschema.from('../hyperschema-fixtures/fixtures/27')
   const { header } = schema.toCode()
 
+  t.ok(header.includes('#ifndef NS27_SCHEMA_H'), 'namespaced include guard')
   t.ok(header.includes('typedef struct ns27_counter_s {'), 'struct typedef')
   t.ok(header.includes('uintmax_t value;'), 'uint field')
   t.ok(!header.includes('bool has_'), 'no has_ for required fields')
