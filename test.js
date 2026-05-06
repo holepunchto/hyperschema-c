@@ -1,7 +1,6 @@
 const path = require('path')
 const test = require('brittle')
 const CHyperschema = require('.')
-
 const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/package')), 'fixtures')
 
 test('required uint only - header', (t) => {

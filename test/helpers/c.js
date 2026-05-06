@@ -1,0 +1,124 @@
+const { spawnSync } = require('child_process')
+const path = require('path')
+const fs = require('fs')
+const CHyperschema = require('../../index.js')
+const { toCName, structName } = require('../../lib/codegen')
+
+const WORKSPACE = path.join(__dirname, '../c-workspace')
+const BARE_MAKE = path.join(WORKSPACE, 'node_modules', '.bin', 'bare-make')
+const TIMEOUT = 120000
+
+function runC(hyperschema, mainC) {
+  CHyperschema.toDisk(hyperschema, WORKSPACE)
+  fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
+
+  const generate = spawnSync(BARE_MAKE, ['generate'], {
+    cwd: WORKSPACE,
+    encoding: 'utf8',
+    timeout: TIMEOUT
+  })
+
+  if (generate.status !== 0) {
+    return { ok: false, stderr: generate.stderr + generate.stdout }
+  }
+
+  const build = spawnSync(BARE_MAKE, ['build'], {
+    cwd: WORKSPACE,
+    encoding: 'utf8',
+    timeout: TIMEOUT
+  })
+
+  if (build.status !== 0) {
+    return { ok: false, stderr: build.stderr + build.stdout }
+  }
+
+  const exe = path.join(
+    WORKSPACE,
+    'build',
+    process.platform === 'win32' ? 'schema_test.exe' : 'schema_test'
+  )
+
+  const run = spawnSync(exe, [], { encoding: 'utf8', timeout: 10000 })
+
+  return {
+    ok: run.status === 0,
+    stdout: run.stdout || '',
+    stderr: run.stderr || ''
+  }
+}
+
+function generateRoundTrip(name, type, testValue) {
+  const lines = []
+  lines.push(`  {`)
+  lines.push(`    ${name}_t orig;`)
+  lines.push(`    memset(&orig, 0, sizeof(orig));`)
+  for (const f of type.fields) {
+    const cField = toCName(f.name)
+    const val = testValue[f.name]
+    if (!f.required) {
+      if (val !== undefined) {
+        lines.push(`    orig.has_${cField} = true;`)
+        lines.push(`    orig.${cField} = ${val}ULL;`)
+      } else {
+        lines.push(`    orig.has_${cField} = false;`)
+      }
+    } else {
+      lines.push(`    orig.${cField} = ${val}ULL;`)
+    }
+  }
+  lines.push(`    compact_state_t st = {0, 0};`)
+  lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
+  lines.push(`    st.buffer = malloc(st.end);`)
+  lines.push(`    err = ${name}_encode(&st, &orig); assert(err == 0);`)
+  lines.push(`    st.start = 0;`)
+  lines.push(`    ${name}_t dec;`)
+  lines.push(`    memset(&dec, 0, sizeof(dec));`)
+  lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
+  for (const f of type.fields) {
+    const cField = toCName(f.name)
+    const val = testValue[f.name]
+    if (!f.required) {
+      if (val !== undefined) {
+        lines.push(`    assert(dec.has_${cField} == true);`)
+        lines.push(`    assert(dec.${cField} == ${val}ULL);`)
+      } else {
+        lines.push(`    assert(dec.has_${cField} == false);`)
+      }
+    } else {
+      lines.push(`    assert(dec.${cField} == ${val}ULL);`)
+    }
+  }
+  lines.push(`    free(st.buffer);`)
+  lines.push(`  }`)
+  return lines
+}
+
+function generateMainC(schema, fixtureDir) {
+  const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
+
+  const type = [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
+  const name = structName(type)
+
+  const lines = [
+    '#include <assert.h>',
+    '#include <stdlib.h>',
+    '#include <string.h>',
+    '#include "schema.h"',
+    '',
+    'int main () {',
+    '  int err;',
+    ''
+  ]
+
+  for (const testValue of testData.values) {
+    lines.push(...generateRoundTrip(name, type, testValue))
+    lines.push('')
+  }
+
+  lines.push('  return 0;')
+  lines.push('}')
+  lines.push('')
+  return lines.join('\n')
+}
+
+module.exports = { runC, generateMainC }
