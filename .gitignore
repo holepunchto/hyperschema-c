@@ -1,7 +1,2 @@
 node_modules
 package-lock.json
-test/c-workspace/build
-test/c-workspace/main.c
-test/c-workspace/schema.h
-test/c-workspace/schema.c
-test/c-workspace/schema.json

@@ -30,5 +30,3 @@ jobs:
     steps:
       - uses: holepunchto/actions/bare-base@v1
       - run: npm test
-      - run: npm install --prefix test/c-workspace
-      - run: npm run test:c

@@ -29,7 +29,7 @@
   "scripts": {
     "format": "prettier . --write && lunte --fix",
     "lint": "prettier . --check && lunte",
-    "test": "npm run test:bare && npm run test:node",
+    "test": "npm run test:bare && npm run test:node && npm run test:c",
     "test:bare": "brittle-bare --coverage test.js",
     "test:node": "brittle-node --coverage test.js",
     "test:c": "brittle-node test/c.js"
@@ -39,6 +39,9 @@
     "url": "git+https://github.com/holepunchto/hyperschema-c.git"
   },
   "author": "Holepunch",
+  "workspaces": [
+    "test/c-workspace"
+  ],
   "license": "Apache-2.0",
   "dependencies": {
     "bare-fs": "^4.7.1",
