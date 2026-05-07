@@ -15,4 +15,3 @@ set_target_properties(
 )
 
 target_link_libraries(schema_test PRIVATE compact_static)
-target_include_directories(schema_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
