@@ -47,7 +47,7 @@
   "devDependencies": {
     "bare-path": "^3.0.0",
     "brittle": "^3.7.0",
-    "hyperschema-test": "file:../hyperschema-test",
+    "hyperschema-test": "github:holepunchto/hyperschema-test#feat/fixture-32",
     "lunte": "^1.8.0",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0",
