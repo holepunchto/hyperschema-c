@@ -76,7 +76,7 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     if (!f.required) {
-      if (val != null) {
+      if (val !== null && val !== undefined) {
         lines.push(`    orig.has_${cField} = true;`)
         lines.push(`    orig.${cField} = ${val}ULL;`)
       } else {
@@ -98,7 +98,7 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     if (!f.required) {
-      if (val != null) {
+      if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
         lines.push(`    assert(dec.${cField} == ${val}ULL);`)
       } else {
