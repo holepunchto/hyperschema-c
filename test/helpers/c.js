@@ -18,11 +18,13 @@ function generateWorkspaceCMake(hyperschema) {
   }
   const target = namespaces.join('_')
   return [
-    'cmake_minimum_required(VERSION 3.25)',
+    'cmake_minimum_required(VERSION 4.0)',
     '',
     `find_package(cmake-fetch REQUIRED PATHS "${CMAKE_FETCH}")`,
     '',
     'project(schema_test C)',
+    '',
+    'fetch_package("github:holepunchto/libcompact")',
     '',
     'add_subdirectory(schema)',
     '',
@@ -34,7 +36,7 @@ function generateWorkspaceCMake(hyperschema) {
     '  C_STANDARD 99',
     ')',
     '',
-    `target_link_libraries(schema_test PRIVATE ${target})`,
+    `target_link_libraries(schema_test PRIVATE ${target} compact)`,
     ''
   ].join('\n')
 }
