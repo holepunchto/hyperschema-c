@@ -30,7 +30,7 @@ class CHyperschema extends Hyperschema {
     fs.writeFileSync(path.join(root, 'schema.c'), source, {
       encoding: 'utf-8'
     })
-    fs.writeFileSync(path.join(root, 'CMakeLists.txt'), generateCMake(), {
+    fs.writeFileSync(path.join(root, 'CMakeLists.txt'), generateCMake(hyperschema), {
       encoding: 'utf-8'
     })
   }

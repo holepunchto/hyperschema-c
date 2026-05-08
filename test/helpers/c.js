@@ -9,9 +9,37 @@ const SCHEMA_DIR = path.join(WORKSPACE, 'schema')
 const BARE_MAKE = path.join(WORKSPACE, 'node_modules', '.bin', 'bare-make')
 const TIMEOUT = 120000
 
+function generateWorkspaceCMake(hyperschema) {
+  const structs = [...hyperschema.types.values()].filter((t) => t.isStruct)
+  const namespaces = [...new Set(structs.map((t) => toCName(t.namespace)))]
+  if (!namespaces.length) throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
+  const target = namespaces.join('_')
+  return [
+    'cmake_minimum_required(VERSION 3.25)',
+    '',
+    'find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)',
+    '',
+    'project(schema_test C)',
+    '',
+    'add_subdirectory(schema)',
+    '',
+    'add_executable(schema_test main.c)',
+    '',
+    'set_target_properties(',
+    '  schema_test',
+    '  PROPERTIES',
+    '  C_STANDARD 99',
+    ')',
+    '',
+    `target_link_libraries(schema_test PRIVATE ${target})`,
+    ''
+  ].join('\n')
+}
+
 function runC(hyperschema, mainC) {
   CHyperschema.toDisk(hyperschema, SCHEMA_DIR)
   fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
+  fs.writeFileSync(path.join(WORKSPACE, 'CMakeLists.txt'), generateWorkspaceCMake(hyperschema))
 
   const shell = process.platform === 'win32'
 

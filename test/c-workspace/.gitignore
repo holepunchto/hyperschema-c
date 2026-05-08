@@ -1,3 +1,4 @@
 build
 main.c
+CMakeLists.txt
 schema/
