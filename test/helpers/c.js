@@ -6,7 +6,7 @@ const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
 const SCHEMA_DIR = path.join(WORKSPACE, 'schema')
-const BARE_MAKE = path.join(WORKSPACE, 'node_modules', '.bin', 'bare-make')
+const BARE_MAKE = path.join(__dirname, '../../node_modules/.bin/bare-make')
 const TIMEOUT = 120000
 
 function generateWorkspaceCMake(hyperschema) {
