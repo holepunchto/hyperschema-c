@@ -11,7 +11,12 @@ const CMAKE_FETCH = path.join(__dirname, '../../node_modules/cmake-fetch').repla
 const TIMEOUT = 120000
 
 function generateWorkspaceCMake(hyperschema) {
-  const structs = [...hyperschema.types.values()].filter((t) => t.isStruct)
+  const structs = []
+  for (let i = 0; i < hyperschema.schema.length; i++) {
+    const fqn = hyperschema.typesByPosition.get(i)
+    const type = hyperschema.resolve(fqn)
+    if (type.isStruct) structs.push(type)
+  }
   const namespaces = [...new Set(structs.map((t) => toCName(t.namespace)))]
   if (!namespaces.length) {
     throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
@@ -112,6 +117,9 @@ function generateRoundTrip(name, type, testValue) {
         lines.push(`    orig.has_${cField} = false;`)
       }
     } else {
+      if (val === null || val === undefined) {
+        throw new Error(`fixture has null value for required field '${f.name}' in type '${name}'`)
+      }
       lines.push(`    orig.${cField} = ${val}ULL;`)
     }
   }
