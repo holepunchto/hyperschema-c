@@ -2,19 +2,15 @@ const { spawnSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 const { toCName, structName } = require('../../lib/codegen')
+const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
+const SCHEMA_DIR = path.join(WORKSPACE, 'schema')
 const BARE_MAKE = path.join(WORKSPACE, 'node_modules', '.bin', 'bare-make')
 const TIMEOUT = 120000
 
-function runC(hyperschema, mainC, code) {
-  fs.writeFileSync(
-    path.join(WORKSPACE, 'schema.json'),
-    JSON.stringify(hyperschema.toJSON(), null, 2) + '\n',
-    { encoding: 'utf-8' }
-  )
-  fs.writeFileSync(path.join(WORKSPACE, 'schema.h'), code.header, { encoding: 'utf-8' })
-  fs.writeFileSync(path.join(WORKSPACE, 'schema.c'), code.source, { encoding: 'utf-8' })
+function runC(hyperschema, mainC) {
+  CHyperschema.toDisk(hyperschema, SCHEMA_DIR)
   fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
 
   const shell = process.platform === 'win32'

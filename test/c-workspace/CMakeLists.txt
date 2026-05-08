@@ -4,9 +4,9 @@ find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 
 project(schema_test C)
 
-fetch_package("github:holepunchto/libcompact")
+add_subdirectory(schema)
 
-add_executable(schema_test schema.c main.c)
+add_executable(schema_test main.c)
 
 set_target_properties(
   schema_test
@@ -14,4 +14,4 @@ set_target_properties(
   C_STANDARD 99
 )
 
-target_link_libraries(schema_test PRIVATE compact_static)
+target_link_libraries(schema_test PRIVATE schema)

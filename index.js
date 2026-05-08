@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const Hyperschema = require('hyperschema')
 const generateC = require('./lib/codegen')
+const { generateCMake } = generateC
 
 class CHyperschema extends Hyperschema {
   toCode() {
@@ -27,6 +28,9 @@ class CHyperschema extends Hyperschema {
       encoding: 'utf-8'
     })
     fs.writeFileSync(path.join(root, 'schema.c'), source, {
+      encoding: 'utf-8'
+    })
+    fs.writeFileSync(path.join(root, 'CMakeLists.txt'), generateCMake(), {
       encoding: 'utf-8'
     })
   }

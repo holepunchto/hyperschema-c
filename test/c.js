@@ -20,10 +20,10 @@ const fixtures = fs
 for (const fix of fixtures) {
   const fixtureDir = path.join(fixturesDir, fix)
 
-  let schema, code
+  let schema
   try {
     schema = CHyperschema.from(fixtureDir)
-    code = schema.toCode()
+    schema.toCode()
   } catch {
     continue
   }
@@ -31,7 +31,7 @@ for (const fix of fixtures) {
   if (!primaryType(schema)) continue
 
   test(`fixture ${fix} - compile and round-trip`, (t) => {
-    const result = runC(schema, generateMainC(schema, fixtureDir), code)
+    const result = runC(schema, generateMainC(schema, fixtureDir))
     t.ok(result.ok, result.ok ? 'compile and run' : `compile/run failed:\n${result.stderr}`)
   })
 }
