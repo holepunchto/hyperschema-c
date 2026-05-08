@@ -24,7 +24,8 @@ for (const fix of fixtures) {
   try {
     schema = CHyperschema.from(fixtureDir)
     schema.toCode()
-  } catch {
+  } catch (e) {
+    if (!e.message.includes('only uint is supported')) throw e
     continue
   }
 
