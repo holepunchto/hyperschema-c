@@ -12,7 +12,9 @@ const TIMEOUT = 120000
 function generateWorkspaceCMake(hyperschema) {
   const structs = [...hyperschema.types.values()].filter((t) => t.isStruct)
   const namespaces = [...new Set(structs.map((t) => toCName(t.namespace)))]
-  if (!namespaces.length) throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
+  if (!namespaces.length) {
+    throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
+  }
   const target = namespaces.join('_')
   return [
     'cmake_minimum_required(VERSION 3.25)',
