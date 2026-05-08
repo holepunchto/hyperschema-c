@@ -32,6 +32,6 @@ for (const fix of fixtures) {
 
   test(`fixture ${fix} - compile and round-trip`, (t) => {
     const result = runC(schema, generateMainC(schema, fixtureDir), code)
-    t.ok(result.ok, `compile/run failed:\n${result.stderr}`)
+    t.ok(result.ok, result.ok ? 'compile and run' : `compile/run failed:\n${result.stderr}`)
   })
 }
