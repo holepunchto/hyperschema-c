@@ -17,6 +17,14 @@
     "package.json"
   ],
   "imports": {
+    "child_process": {
+      "bare": "bare-subprocess",
+      "default": "child_process"
+    },
+    "os": {
+      "bare": "bare-os",
+      "default": "os"
+    },
     "fs": {
       "bare": "bare-fs",
       "default": "fs"
@@ -38,15 +46,20 @@
     "url": "git+https://github.com/holepunchto/hyperschema-c.git"
   },
   "author": "Holepunch",
+  "workspaces": [
+    "test/c-workspace"
+  ],
   "license": "Apache-2.0",
   "dependencies": {
     "bare-fs": "^4.7.1",
     "hyperschema": "^1.20.1"
   },
   "devDependencies": {
+    "bare-os": "^3.9.1",
     "bare-path": "^3.0.0",
+    "bare-subprocess": "^6.0.0",
     "brittle": "^3.7.0",
-    "hyperschema-test": "^1.0.0",
+    "hyperschema-test": "^1.0.1",
     "lunte": "^1.8.0",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0",

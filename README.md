@@ -27,6 +27,7 @@ output/
   schema.h
   schema.c
   schema.json
+  CMakeLists.txt
 ```
 
 ## License
