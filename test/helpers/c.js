@@ -1,4 +1,5 @@
 const { spawnSync } = require('child_process')
+const os = require('os')
 const path = require('path')
 const fs = require('fs')
 const { toCName, structName } = require('../../lib/codegen')
@@ -51,7 +52,7 @@ function runC(hyperschema, mainC) {
   fs.writeFileSync(path.join(WORKSPACE, 'main.c'), mainC)
   fs.writeFileSync(path.join(WORKSPACE, 'CMakeLists.txt'), generateWorkspaceCMake(hyperschema))
 
-  const shell = process.platform === 'win32'
+  const shell = os.platform() === 'win32'
 
   const generate = spawnSync(BARE_MAKE, ['generate'], {
     cwd: WORKSPACE,
@@ -81,7 +82,7 @@ function runC(hyperschema, mainC) {
   const exe = path.join(
     WORKSPACE,
     'build',
-    process.platform === 'win32' ? 'schema_test.exe' : 'schema_test'
+    os.platform() === 'win32' ? 'schema_test.exe' : 'schema_test'
   )
 
   const run = spawnSync(exe, [], { encoding: 'utf8', timeout: 10000 })

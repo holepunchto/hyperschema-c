@@ -17,6 +17,14 @@
     "package.json"
   ],
   "imports": {
+    "child_process": {
+      "bare": "bare-subprocess",
+      "default": "child_process"
+    },
+    "os": {
+      "bare": "bare-os",
+      "default": "os"
+    },
     "fs": {
       "bare": "bare-fs",
       "default": "fs"
@@ -29,10 +37,9 @@
   "scripts": {
     "format": "prettier . --write && lunte --fix",
     "lint": "prettier . --check && lunte",
-    "test": "npm run test:bare && npm run test:node && npm run test:c",
-    "test:bare": "brittle-bare --coverage test.js",
-    "test:node": "brittle-node --coverage test.js",
-    "test:c": "brittle-node test/c.js"
+    "test": "npm run test:bare && npm run test:node",
+    "test:bare": "brittle-bare --coverage test.js test/c.js",
+    "test:node": "brittle-node --coverage test.js test/c.js"
   },
   "repository": {
     "type": "git",
@@ -48,7 +55,9 @@
     "hyperschema": "^1.20.1"
   },
   "devDependencies": {
+    "bare-os": "^3.9.1",
     "bare-path": "^3.0.0",
+    "bare-subprocess": "^6.0.0",
     "brittle": "^3.7.0",
     "hyperschema-test": "^1.0.1",
     "lunte": "^1.8.0",
