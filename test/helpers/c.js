@@ -7,6 +7,7 @@ const CHyperschema = require('../..')
 const WORKSPACE = path.join(__dirname, '../c-workspace')
 const SCHEMA_DIR = path.join(WORKSPACE, 'schema')
 const BARE_MAKE = path.join(__dirname, '../../node_modules/.bin/bare-make')
+const CMAKE_FETCH = path.join(__dirname, '../../node_modules/cmake-fetch')
 const TIMEOUT = 120000
 
 function generateWorkspaceCMake(hyperschema) {
@@ -19,7 +20,7 @@ function generateWorkspaceCMake(hyperschema) {
   return [
     'cmake_minimum_required(VERSION 3.25)',
     '',
-    'find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)',
+    `find_package(cmake-fetch REQUIRED PATHS "${CMAKE_FETCH}")`,
     '',
     'project(schema_test C)',
     '',
