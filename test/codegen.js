@@ -90,7 +90,6 @@ test('fixed-width uint fields - correct C types and functions', (t) => {
   t.ok(source.includes('compact_decode_uint64(state, &result->d)'), 'decode uint64')
 })
 
-
 test('signed fixed-width int fields - correct C types and functions', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
