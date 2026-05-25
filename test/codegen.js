@@ -113,5 +113,5 @@ test('signed fixed-width int fields - correct C types and functions', (t) => {
 
 test('unsupported type throws', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '1'))
-  t.exception(() => schema.toCode(), /unsupported field type "string"/)
+  t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
 })
