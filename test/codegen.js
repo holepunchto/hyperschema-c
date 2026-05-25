@@ -178,6 +178,57 @@ test('buffer field - correct C members and functions', (t) => {
   )
 })
 
+test('required array of uint - correct C members and encode/decode', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'list',
+    fields: [{ name: 'items', type: 'uint', required: true, array: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uintmax_t *items; /* array */'), 'array pointer field')
+  t.ok(header.includes('size_t items_len;'), 'array length field')
+  t.ok(!header.includes('bool has_items'), 'no has_ for required array')
+  t.ok(source.includes('compact_preencode_uint(state, value->items_len)'), 'preencode length')
+  t.ok(source.includes('for (size_t _i = 0; _i < value->items_len; _i++)'), 'preencode loop')
+  t.ok(source.includes('compact_preencode_uint(state, value->items[_i])'), 'preencode element')
+  t.ok(source.includes('compact_encode_uint(state, value->items_len)'), 'encode length')
+  t.ok(source.includes('compact_encode_uint(state, value->items[_i])'), 'encode element')
+  t.ok(source.includes('compact_decode_uint(state, &_count)'), 'decode count')
+  t.ok(source.includes('calloc(_count, sizeof(*result->items))'), 'calloc')
+  t.ok(source.includes('compact_decode_uint(state, &result->items[_i])'), 'decode element')
+  t.ok(source.includes('#include <stdlib.h>'), 'stdlib.h for calloc')
+})
+
+test('optional array of uint - has_ flag and conditional encode/decode', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'bag',
+    fields: [{ name: 'values', type: 'uint', array: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('bool has_values;'), 'has_ flag for optional array')
+  t.ok(source.includes('uintmax_t flags = 0;'), 'flags variable')
+  t.ok(source.includes('if (value->has_values)'), 'conditional encode')
+  t.ok(source.includes('if (result->has_values)'), 'conditional decode')
+})
+
+test('required array of fixed32 - pointer-to-array type and no & in decode', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'chain',
+    fields: [{ name: 'hashes', type: 'fixed32', required: true, array: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint8_t (*hashes)[32]; /* array of fixed32 */'), 'pointer-to-array type')
+  t.ok(source.includes('compact_preencode_fixed32(state, value->hashes[_i])'), 'preencode element')
+  t.ok(source.includes('compact_encode_fixed32(state, value->hashes[_i])'), 'encode element')
+  t.ok(source.includes('compact_decode_fixed32(state, result->hashes[_i])'), 'decode (no &)')
+  t.ok(source.includes('calloc(_count, sizeof(*result->hashes))'), 'calloc with correct size')
+})
+
 test('unsupported type throws', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '1'))
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
