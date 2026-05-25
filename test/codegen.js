@@ -111,6 +111,34 @@ test('signed fixed-width int fields - correct C types and functions', (t) => {
   t.ok(source.includes('compact_decode_int32(state, &result->c)'), 'decode int32')
 })
 
+test('fixed32 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'node',
+    fields: [{ name: 'hash', type: 'fixed32', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint8_t hash[32];'), 'fixed32 field type')
+  t.ok(source.includes('compact_preencode_fixed32(state, value->hash)'), 'preencode fixed32')
+  t.ok(source.includes('compact_encode_fixed32(state, value->hash)'), 'encode fixed32')
+  t.ok(source.includes('compact_decode_fixed32(state, result->hash)'), 'decode fixed32 (no &)')
+})
+
+test('fixed64 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'key',
+    fields: [{ name: 'data', type: 'fixed64', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint8_t data[64];'), 'fixed64 field type')
+  t.ok(source.includes('compact_preencode_fixed64(state, value->data)'), 'preencode fixed64')
+  t.ok(source.includes('compact_encode_fixed64(state, value->data)'), 'encode fixed64')
+  t.ok(source.includes('compact_decode_fixed64(state, result->data)'), 'decode fixed64 (no &)')
+})
+
 test('bool field - correct C type and functions', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
