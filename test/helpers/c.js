@@ -2,7 +2,7 @@ const { spawnSync } = require('child_process')
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const { toCName, structName, typeInfo, resolveBase } = require('../../lib/codegen')
+const { toCName, structName, typeInfo, resolveBase, fixedSize } = require('../../lib/codegen')
 const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
@@ -111,12 +111,20 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
+    const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    orig.has_${cField} = true;`)
-        lines.push(`    orig.${cField} = ${lit(val)};`)
+        if (isFixed) {
+          const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+          lines.push(
+            `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
+          )
+        } else {
+          lines.push(`    orig.${cField} = ${lit(val)};`)
+        }
       } else {
         lines.push(`    orig.has_${cField} = false;`)
       }
@@ -124,7 +132,14 @@ function generateRoundTrip(name, type, testValue) {
       if (val === null || val === undefined) {
         throw new Error(`fixture has null value for required field '${f.name}' in type '${name}'`)
       }
-      lines.push(`    orig.${cField} = ${lit(val)};`)
+      if (isFixed) {
+        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        lines.push(
+          `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
+        )
+      } else {
+        lines.push(`    orig.${cField} = ${lit(val)};`)
+      }
     }
   }
   lines.push(`    compact_state_t st = {0, 0};`)
@@ -139,17 +154,28 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
+    const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
-        lines.push(`    assert(dec.${cField} == ${lit(val)});`)
+        if (isFixed) {
+          lines.push(
+            `    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`
+          )
+        } else {
+          lines.push(`    assert(dec.${cField} == ${lit(val)});`)
+        }
       } else {
         lines.push(`    assert(dec.has_${cField} == false);`)
       }
     } else {
-      lines.push(`    assert(dec.${cField} == ${lit(val)});`)
+      if (isFixed) {
+        lines.push(`    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`)
+      } else {
+        lines.push(`    assert(dec.${cField} == ${lit(val)});`)
+      }
     }
   }
   lines.push(`    free(st.buffer);`)
