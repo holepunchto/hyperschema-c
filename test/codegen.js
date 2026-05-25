@@ -154,6 +154,30 @@ test('bool field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_bool(state, &result->active)'), 'decode bool')
 })
 
+test('buffer field - correct C members and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'msg',
+    fields: [{ name: 'data', type: 'buffer', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint8_t *data; /* borrows from decode buffer */'), 'buffer pointer field')
+  t.ok(header.includes('size_t data_len;'), 'buffer length field')
+  t.ok(
+    source.includes('compact_preencode_uint8array(state, value->data, value->data_len)'),
+    'preencode buffer'
+  )
+  t.ok(
+    source.includes('compact_encode_uint8array(state, value->data, value->data_len)'),
+    'encode buffer'
+  )
+  t.ok(
+    source.includes('compact_decode_uint8array(state, &result->data, &result->data_len)'),
+    'decode buffer'
+  )
+})
+
 test('unsupported type throws', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '1'))
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
