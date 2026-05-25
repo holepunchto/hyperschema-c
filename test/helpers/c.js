@@ -110,8 +110,9 @@ function generateRoundTrip(name, type, testValue) {
   for (const f of type.fields) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
-    const { signed } = typeInfo(resolveBase(f.type).name)
-    const lit = (v) => (signed ? `${v}LL` : `${v}ULL`)
+    const info = typeInfo(resolveBase(f.type).name)
+    const lit = (v) =>
+      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    orig.has_${cField} = true;`)
@@ -137,8 +138,9 @@ function generateRoundTrip(name, type, testValue) {
   for (const f of type.fields) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
-    const { signed } = typeInfo(resolveBase(f.type).name)
-    const lit = (v) => (signed ? `${v}LL` : `${v}ULL`)
+    const info = typeInfo(resolveBase(f.type).name)
+    const lit = (v) =>
+      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
