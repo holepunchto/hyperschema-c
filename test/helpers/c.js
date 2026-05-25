@@ -119,7 +119,9 @@ function generateRoundTrip(name, type, testValue) {
         lines.push(`    orig.has_${cField} = true;`)
         if (isFixed) {
           const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-          lines.push(`    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`)
+          lines.push(
+            `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
+          )
         } else {
           lines.push(`    orig.${cField} = ${lit(val)};`)
         }
@@ -132,7 +134,9 @@ function generateRoundTrip(name, type, testValue) {
       }
       if (isFixed) {
         const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-        lines.push(`    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`)
+        lines.push(
+          `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
+        )
       } else {
         lines.push(`    orig.${cField} = ${lit(val)};`)
       }
@@ -157,7 +161,9 @@ function generateRoundTrip(name, type, testValue) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
         if (isFixed) {
-          lines.push(`    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`)
+          lines.push(
+            `    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`
+          )
         } else {
           lines.push(`    assert(dec.${cField} == ${lit(val)});`)
         }
