@@ -111,6 +111,21 @@ test('signed fixed-width int fields - correct C types and functions', (t) => {
   t.ok(source.includes('compact_decode_int32(state, &result->c)'), 'decode int32')
 })
 
+test('bool field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'flags',
+    fields: [{ name: 'active', type: 'bool', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('#include <stdbool.h>'), 'stdbool.h included for bool field')
+  t.ok(header.includes('bool active;'), 'bool field type')
+  t.ok(source.includes('compact_preencode_bool(state, value->active)'), 'preencode bool')
+  t.ok(source.includes('compact_encode_bool(state, value->active)'), 'encode bool')
+  t.ok(source.includes('compact_decode_bool(state, &result->active)'), 'decode bool')
+})
+
 test('unsupported type throws', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '1'))
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
