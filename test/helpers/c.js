@@ -2,7 +2,7 @@ const { spawnSync } = require('child_process')
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const { toCName, structName, typeInfo, resolveBase } = require('../../lib/codegen')
+const { toCName, structName, typeInfo, resolveBase, fixedSize } = require('../../lib/codegen')
 const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
@@ -111,7 +111,7 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
-    const isFixed = info.compactSuffix.startsWith('fixed')
+    const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
@@ -150,7 +150,7 @@ function generateRoundTrip(name, type, testValue) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
-    const isFixed = info.compactSuffix.startsWith('fixed')
+    const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
