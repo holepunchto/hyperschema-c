@@ -162,7 +162,7 @@ test('buffer field - correct C members and functions', (t) => {
     fields: [{ name: 'data', type: 'buffer', required: true }]
   })
   const { header, source } = schema.toCode()
-  t.ok(header.includes('uint8_t *data;'), 'buffer pointer field')
+  t.ok(header.includes('uint8_t *data; /* borrows from decode buffer */'), 'buffer pointer field')
   t.ok(header.includes('size_t data_len;'), 'buffer length field')
   t.ok(
     source.includes('compact_preencode_uint8array(state, value->data, value->data_len)'),
