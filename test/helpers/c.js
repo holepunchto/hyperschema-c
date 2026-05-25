@@ -2,7 +2,7 @@ const { spawnSync } = require('child_process')
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const { toCName, structName } = require('../../lib/codegen')
+const { toCName, structName, typeInfo, resolveBase } = require('../../lib/codegen')
 const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
@@ -110,10 +110,12 @@ function generateRoundTrip(name, type, testValue) {
   for (const f of type.fields) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
+    const { signed } = typeInfo(resolveBase(f.type).name)
+    const lit = (v) => (signed ? `${v}LL` : `${v}ULL`)
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    orig.has_${cField} = true;`)
-        lines.push(`    orig.${cField} = ${val}ULL;`)
+        lines.push(`    orig.${cField} = ${lit(val)};`)
       } else {
         lines.push(`    orig.has_${cField} = false;`)
       }
@@ -121,7 +123,7 @@ function generateRoundTrip(name, type, testValue) {
       if (val === null || val === undefined) {
         throw new Error(`fixture has null value for required field '${f.name}' in type '${name}'`)
       }
-      lines.push(`    orig.${cField} = ${val}ULL;`)
+      lines.push(`    orig.${cField} = ${lit(val)};`)
     }
   }
   lines.push(`    compact_state_t st = {0, 0};`)
@@ -135,15 +137,17 @@ function generateRoundTrip(name, type, testValue) {
   for (const f of type.fields) {
     const cField = toCName(f.name)
     const val = testValue[f.name]
+    const { signed } = typeInfo(resolveBase(f.type).name)
+    const lit = (v) => (signed ? `${v}LL` : `${v}ULL`)
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
-        lines.push(`    assert(dec.${cField} == ${val}ULL);`)
+        lines.push(`    assert(dec.${cField} == ${lit(val)});`)
       } else {
         lines.push(`    assert(dec.has_${cField} == false);`)
       }
     } else {
-      lines.push(`    assert(dec.${cField} == ${val}ULL);`)
+      lines.push(`    assert(dec.${cField} == ${lit(val)});`)
     }
   }
   lines.push(`    free(st.buffer);`)
