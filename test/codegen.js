@@ -178,6 +178,40 @@ test('buffer field - correct C members and functions', (t) => {
   )
 })
 
+test('string field - correct C member and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'msg',
+    fields: [{ name: 'title', type: 'string', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(
+    header.includes('utf8_string_view_t title; /* borrows from decode buffer */'),
+    'string view field'
+  )
+  t.ok(source.includes('compact_preencode_utf8(state, value->title)'), 'preencode string')
+  t.ok(source.includes('compact_encode_utf8(state, value->title)'), 'encode string')
+  t.ok(source.includes('compact_decode_utf8(state, &result->title)'), 'decode string')
+})
+
+test('json field - same wire format as string', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'doc',
+    fields: [{ name: 'payload', type: 'json', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(
+    header.includes('utf8_string_view_t payload; /* borrows from decode buffer */'),
+    'json uses utf8_string_view_t'
+  )
+  t.ok(source.includes('compact_preencode_utf8(state, value->payload)'), 'preencode json')
+  t.ok(source.includes('compact_encode_utf8(state, value->payload)'), 'encode json')
+  t.ok(source.includes('compact_decode_utf8(state, &result->payload)'), 'decode json')
+})
+
 test('required array of uint - correct C members and encode/decode', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
@@ -240,6 +274,6 @@ test('required array of fixed32 - pointer-to-array type and no & in decode', (t)
 })
 
 test('unsupported type throws', (t) => {
-  const schema = CHyperschema.from(path.join(fixturesDir, '1'))
+  const schema = CHyperschema.from(path.join(fixturesDir, '4'))
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
 })
