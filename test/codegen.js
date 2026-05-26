@@ -196,9 +196,18 @@ test('required array of uint - correct C members and encode/decode', (t) => {
   t.ok(source.includes('compact_encode_uint(state, value->items[_i])'), 'encode element')
   t.ok(source.includes('compact_decode_uint(state, &_count)'), 'decode count')
   t.ok(source.includes('calloc(_count, sizeof(*result->items))'), 'calloc')
-  t.ok(source.includes('if (result->items == NULL && _count > 0) return -1;'), 'calloc null check')
+  t.ok(
+    source.includes('if (result->items == NULL && _count > 0) { err = -1; goto fail; }\n'),
+    'calloc null check uses goto fail'
+  )
   t.ok(source.includes('compact_decode_uint(state, &result->items[_i])'), 'decode element')
+  t.ok(source.includes('goto fail'), 'decode errors goto fail')
+  t.ok(source.includes('fail:'), 'fail label present')
+  t.ok(source.includes('ns1_list_destroy(result)'), 'fail label calls destroy')
   t.ok(source.includes('#include <stdlib.h>'), 'stdlib.h for calloc')
+  t.ok(header.includes('ns1_list_destroy'), '_destroy declared in header')
+  t.ok(source.includes('void\nns1_list_destroy'), '_destroy implemented in source')
+  t.ok(source.includes('free(result->items)'), '_destroy frees array field')
 })
 
 test('optional array of uint - has_ flag and conditional encode/decode', (t) => {
