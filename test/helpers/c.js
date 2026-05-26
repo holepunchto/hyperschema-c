@@ -115,8 +115,15 @@ function generateRoundTrip(name, type, testValue) {
     const { isBuffer, isString } = info
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+    const toStr = (v) => (typeof v === 'string' ? v : JSON.stringify(v))
     const strView = (s) => {
-      const escaped = s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const escaped = s
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+        .replace(/\0/g, '\\0')
       const len = Buffer.byteLength(s, 'utf8')
       return `(utf8_string_view_t){ (const utf8_t *)"${escaped}", ${len} }`
     }
@@ -138,7 +145,7 @@ function generateRoundTrip(name, type, testValue) {
             )
           }
         } else if (isString) {
-          lines.push(`    orig.${cField} = ${strView(String(val))};`)
+          lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
         } else {
           lines.push(`    orig.${cField} = ${lit(val)};`)
         }
@@ -164,7 +171,7 @@ function generateRoundTrip(name, type, testValue) {
           )
         }
       } else if (isString) {
-        lines.push(`    orig.${cField} = ${strView(String(val))};`)
+        lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
       } else {
         lines.push(`    orig.${cField} = ${lit(val)};`)
       }
