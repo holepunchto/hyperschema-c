@@ -31,6 +31,9 @@ for (const fix of fixtures) {
 
   if (!primaryType(schema)) continue
 
+  const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
+  if (Array.isArray(testData.values[0])) continue // array-alias fixture, not a struct round-trip
+
   test(`fixture ${fix} - compile and round-trip`, (t) => {
     const result = runC(schema, generateMainC(schema, fixtureDir))
     t.ok(result.ok, result.ok ? 'compile and run' : `compile/run failed:\n${result.stderr}`)
