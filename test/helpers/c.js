@@ -98,6 +98,28 @@ function runC(hyperschema, mainC) {
   }
 }
 
+function floatLit(v, suffix) {
+  if (!isFinite(v)) throw new Error(`cannot generate C float literal for non-finite value: ${v}`)
+  const s = String(v)
+  const hasDecimal = s.includes('.') || s.includes('e') || s.includes('E')
+  return hasDecimal ? s + suffix : s + '.0' + suffix
+}
+
+function makeLit(info) {
+  return (v) =>
+    info.cType === 'bool'
+      ? v
+        ? 'true'
+        : 'false'
+      : info.cType === 'float'
+        ? floatLit(v, 'f')
+        : info.cType === 'double'
+          ? floatLit(v, '')
+          : info.signed
+            ? `${v}LL`
+            : `${v}ULL`
+}
+
 function primaryType(schema) {
   return [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
 }
@@ -113,8 +135,7 @@ function generateRoundTrip(name, type, testValue) {
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const { isBuffer, isString } = info
-    const lit = (v) =>
-      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+    const lit = makeLit(info)
     const toStr = (v) => (typeof v === 'string' ? v : JSON.stringify(v))
     const strView = (s) => {
       const escaped = s
@@ -191,8 +212,7 @@ function generateRoundTrip(name, type, testValue) {
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const { isBuffer, isString } = info
-    const lit = (v) =>
-      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+    const lit = makeLit(info)
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)
