@@ -146,7 +146,39 @@ function setField(lines, prefix, f, val) {
   const base = resolveBase(f.type)
   const fullPath = `${prefix}${cField}`
 
-  if (f.array) return
+  if (f.array) {
+    const isNull = val === null || val === undefined
+    const arrVal = !isNull && Array.isArray(val) ? val : []
+    if (!f.required) {
+      if (isNull) {
+        lines.push(`    orig.${prefix}has_${cField} = false;`)
+        return
+      }
+      lines.push(`    orig.${prefix}has_${cField} = true;`)
+    } else {
+      if (isNull) throw new Error(`fixture has null value for required array field '${f.name}' at '${prefix}'`)
+    }
+    if (base.isStruct || arrVal.length === 0) {
+      lines.push(`    orig.${fullPath} = NULL; orig.${fullPath}_len = 0;`)
+      return
+    }
+    const info = typeInfo(base.name)
+    const { isBuffer, isString, cType } = info
+    const lit = makeLit(info)
+    const varName = `_arr_${cField}`
+    if (isString) {
+      const elems = arrVal.map((v) => strView(toStr(v))).join(', ')
+      lines.push(`    { static utf8_string_view_t ${varName}[] = {${elems}};`)
+      lines.push(`      orig.${fullPath} = ${varName}; orig.${fullPath}_len = ${arrVal.length}; }`)
+    } else if (!isBuffer && fixedSize(base.name) === 0) {
+      const elems = arrVal.map((v) => lit(v)).join(', ')
+      lines.push(`    { static ${cType} ${varName}[] = {${elems}};`)
+      lines.push(`      orig.${fullPath} = ${varName}; orig.${fullPath}_len = ${arrVal.length}; }`)
+    } else {
+      lines.push(`    orig.${fullPath} = NULL; orig.${fullPath}_len = 0;`)
+    }
+    return
+  }
 
   if (base.isStruct) {
     if (!f.required) {
@@ -157,6 +189,9 @@ function setField(lines, prefix, f, val) {
         lines.push(`    orig.${prefix}has_${cField} = false;`)
       }
     } else {
+      if (val === null || val === undefined) {
+        throw new Error(`fixture has null value for required struct field '${f.name}' at '${prefix}'`)
+      }
       for (const sf of base.fields) setField(lines, `${fullPath}.`, sf, val[sf.name])
     }
     return
@@ -223,7 +258,36 @@ function compareField(lines, prefix, f, val) {
   const base = resolveBase(f.type)
   const fullPath = `${prefix}${cField}`
 
-  if (f.array) return
+  if (f.array) {
+    const isNull = val === null || val === undefined
+    const arrVal = !isNull && Array.isArray(val) ? val : []
+    if (!f.required) {
+      lines.push(`    assert(dec.${prefix}has_${cField} == ${isNull ? 'false' : 'true'});`)
+      if (isNull) return
+    }
+    if (base.isStruct) {
+      lines.push(`    assert(dec.${fullPath}_len == 0);`)
+      return
+    }
+    const info = typeInfo(base.name)
+    const { isBuffer, isString } = info
+    const lit = makeLit(info)
+    lines.push(`    assert(dec.${fullPath}_len == ${arrVal.length});`)
+    for (let i = 0; i < arrVal.length; i++) {
+      const v = arrVal[i]
+      if (isString) {
+        lines.push(`    assert(dec.${fullPath}[${i}].len == orig.${fullPath}[${i}].len);`)
+        if (Buffer.byteLength(toStr(v), 'utf8') > 0) {
+          lines.push(
+            `    assert(memcmp(dec.${fullPath}[${i}].data, orig.${fullPath}[${i}].data, orig.${fullPath}[${i}].len) == 0);`
+          )
+        }
+      } else if (!isBuffer && fixedSize(base.name) === 0) {
+        lines.push(`    assert(dec.${fullPath}[${i}] == orig.${fullPath}[${i}]);`)
+      }
+    }
+    return
+  }
 
   if (base.isStruct) {
     if (!f.required) {
@@ -316,6 +380,7 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
   for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
+  if (type.fields.some((f) => f.array)) lines.push(`    ${name}_destroy(&dec);`)
   lines.push(`  }`)
   return lines
 }
