@@ -113,8 +113,21 @@ function generateRoundTrip(name, type, testValue) {
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const { isBuffer, isString } = info
+    const floatLit = (v, suffix) => {
+      const s = String(v)
+      const hasDecimal = s.includes('.') || s.includes('e') || s.includes('E')
+      return hasDecimal ? s + suffix : s + '.0' + suffix
+    }
     const lit = (v) =>
-      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+      info.cType === 'bool'
+        ? v ? 'true' : 'false'
+        : info.cType === 'float'
+          ? floatLit(v, 'f')
+          : info.cType === 'double'
+            ? floatLit(v, '')
+            : info.signed
+              ? `${v}LL`
+              : `${v}ULL`
     const toStr = (v) => (typeof v === 'string' ? v : JSON.stringify(v))
     const strView = (s) => {
       const escaped = s
@@ -191,8 +204,21 @@ function generateRoundTrip(name, type, testValue) {
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
     const { isBuffer, isString } = info
+    const floatLit = (v, suffix) => {
+      const s = String(v)
+      const hasDecimal = s.includes('.') || s.includes('e') || s.includes('E')
+      return hasDecimal ? s + suffix : s + '.0' + suffix
+    }
     const lit = (v) =>
-      info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+      info.cType === 'bool'
+        ? v ? 'true' : 'false'
+        : info.cType === 'float'
+          ? floatLit(v, 'f')
+          : info.cType === 'double'
+            ? floatLit(v, '')
+            : info.signed
+              ? `${v}LL`
+              : `${v}ULL`
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    assert(dec.has_${cField} == true);`)

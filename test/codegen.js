@@ -273,7 +273,40 @@ test('required array of fixed32 - pointer-to-array type and no & in decode', (t)
   t.ok(source.includes('calloc(_count, sizeof(*result->hashes))'), 'calloc with correct size')
 })
 
+test('float32 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'measurement',
+    fields: [{ name: 'value', type: 'float32', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('float value;'), 'float32 field is float')
+  t.ok(source.includes('compact_preencode_float32(state, value->value)'), 'preencode float32')
+  t.ok(source.includes('compact_encode_float32(state, value->value)'), 'encode float32')
+  t.ok(source.includes('compact_decode_float32(state, &result->value)'), 'decode float32')
+})
+
+test('float64 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'precise',
+    fields: [{ name: 'value', type: 'float64', required: true }]
+  })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('double value;'), 'float64 field is double')
+  t.ok(source.includes('compact_preencode_float64(state, value->value)'), 'preencode float64')
+  t.ok(source.includes('compact_encode_float64(state, value->value)'), 'encode float64')
+  t.ok(source.includes('compact_decode_float64(state, &result->value)'), 'decode float64')
+})
+
 test('unsupported type throws', (t) => {
-  const schema = CHyperschema.from(path.join(fixturesDir, '4'))
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'item',
+    fields: [{ name: 'n', type: 'lexint', required: true }]
+  })
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
 })
