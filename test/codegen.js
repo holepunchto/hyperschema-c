@@ -534,6 +534,35 @@ test('optional inline nested struct - has_ flag and conditional direct calls', (
   t.ok(!source.includes('_blob'), 'no blob encoding for inline struct')
 })
 
+test('_destroy nulls array pointer after free to prevent double-free', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'bag',
+    fields: [{ name: 'items', type: 'uint', required: true, array: true }]
+  })
+  const { source } = schema.toCode()
+
+  const freeIdx = source.indexOf('free(result->items)')
+  const nullIdx = source.indexOf('result->items = NULL', freeIdx)
+  t.ok(freeIdx !== -1, 'free emitted')
+  t.ok(nullIdx !== -1 && nullIdx > freeIdx, 'NULL assignment emitted after free')
+})
+
+test('structNeedsDestroy does not infinite-loop on self-referential type', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'node',
+    fields: [
+      { name: 'value', type: 'uint', required: true },
+      { name: 'next', type: '@ns1/node' }
+    ]
+  })
+  const { source } = schema.toCode()
+  t.ok(source.includes('ns1_node_decode'), 'toCode completes without stack overflow')
+})
+
 test('unsupported type throws', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
