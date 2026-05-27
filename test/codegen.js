@@ -301,6 +301,94 @@ test('float64 field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_float64(state, &result->value)'), 'decode float64')
 })
 
+test('uint24 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'uint24', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint32_t value;'), 'uint24 field is uint32_t')
+  t.ok(source.includes('compact_preencode_uint24(state, value->value)'), 'preencode uint24')
+  t.ok(source.includes('compact_encode_uint24(state, value->value)'), 'encode uint24')
+  t.ok(source.includes('compact_decode_uint24(state, &result->value)'), 'decode uint24')
+})
+
+test('uint40 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'uint40', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint64_t value;'), 'uint40 field is uint64_t')
+  t.ok(source.includes('compact_preencode_uint40(state, value->value)'), 'preencode uint40')
+  t.ok(source.includes('compact_encode_uint40(state, value->value)'), 'encode uint40')
+  t.ok(source.includes('compact_decode_uint40(state, &result->value)'), 'decode uint40')
+})
+
+test('uint48 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'uint48', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint64_t value;'), 'uint48 field is uint64_t')
+  t.ok(source.includes('compact_preencode_uint48(state, value->value)'), 'preencode uint48')
+  t.ok(source.includes('compact_encode_uint48(state, value->value)'), 'encode uint48')
+  t.ok(source.includes('compact_decode_uint48(state, &result->value)'), 'decode uint48')
+})
+
+test('uint56 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'uint56', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('uint64_t value;'), 'uint56 field is uint64_t')
+  t.ok(source.includes('compact_preencode_uint56(state, value->value)'), 'preencode uint56')
+  t.ok(source.includes('compact_encode_uint56(state, value->value)'), 'encode uint56')
+  t.ok(source.includes('compact_decode_uint56(state, &result->value)'), 'decode uint56')
+})
+
+test('int24 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'int24', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('int32_t value;'), 'int24 field is int32_t')
+  t.ok(source.includes('compact_preencode_int24(state, value->value)'), 'preencode int24')
+  t.ok(source.includes('compact_encode_int24(state, value->value)'), 'encode int24')
+  t.ok(source.includes('compact_decode_int24(state, &result->value)'), 'decode int24')
+})
+
+test('int40 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'int40', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('int64_t value;'), 'int40 field is int64_t')
+  t.ok(source.includes('compact_preencode_int40(state, value->value)'), 'preencode int40')
+  t.ok(source.includes('compact_encode_int40(state, value->value)'), 'encode int40')
+  t.ok(source.includes('compact_decode_int40(state, &result->value)'), 'decode int40')
+})
+
+test('int48 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'int48', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('int64_t value;'), 'int48 field is int64_t')
+  t.ok(source.includes('compact_preencode_int48(state, value->value)'), 'preencode int48')
+  t.ok(source.includes('compact_encode_int48(state, value->value)'), 'encode int48')
+  t.ok(source.includes('compact_decode_int48(state, &result->value)'), 'decode int48')
+})
+
+test('int56 field - correct C type and functions', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'item', fields: [{ name: 'value', type: 'int56', required: true }] })
+  const { header, source } = schema.toCode()
+  t.ok(header.includes('int64_t value;'), 'int56 field is int64_t')
+  t.ok(source.includes('compact_preencode_int56(state, value->value)'), 'preencode int56')
+  t.ok(source.includes('compact_encode_int56(state, value->value)'), 'encode int56')
+  t.ok(source.includes('compact_decode_int56(state, &result->value)'), 'decode int56')
+})
+
 test('unsupported type throws', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
