@@ -389,6 +389,94 @@ test('int56 field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_int56(state, &result->value)'), 'decode int56')
 })
 
+test('required non-inline nested struct - struct decl and blob encode/decode', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'inner', fields: [{ name: 'x', type: 'uint', required: true }] })
+  ns.register({
+    name: 'outer',
+    fields: [{ name: 'n', type: '@ns1/inner', required: true }]
+  })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('ns1_inner_t n;'), 'nested struct field in struct decl')
+  t.ok(!header.includes('bool has_n;'), 'no has_ for required nested struct')
+  t.ok(source.includes('ns1_inner_preencode(&_inner, &value->n)'), 'inner preencode in preencode')
+  t.ok(source.includes('compact_preencode_uint8array(state, NULL, _inner.end)'), 'blob length in preencode')
+  t.ok(source.includes('ns1_inner_preencode(&_inner, &value->n)'), 'inner preencode in encode')
+  t.ok(source.includes('compact_encode_uint(state, (uintmax_t)_inner.end)'), 'blob length encoded')
+  t.ok(source.includes('ns1_inner_encode(state, &value->n)'), 'inner encode in encode')
+  t.ok(source.includes('compact_decode_uint8array(state, &_blob, &_blob_len)'), 'blob decoded')
+  t.ok(source.includes('compact_state_t _inner = {0, _blob_len, _blob}'), 'inner state from blob')
+  t.ok(source.includes('ns1_inner_decode(&_inner, &result->n)'), 'inner decode in decode')
+})
+
+test('optional non-inline nested struct - has_ flag and conditional encode/decode', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'addr', fields: [{ name: 'city', type: 'string', required: true }] })
+  ns.register({
+    name: 'person',
+    fields: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'addr', type: '@ns1/addr' }
+    ]
+  })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('bool has_addr;'), 'has_ flag for optional nested struct')
+  t.ok(header.includes('ns1_addr_t addr;'), 'nested struct field in struct decl')
+  t.ok(source.includes('if (value->has_addr)'), 'conditional encode checks has_')
+  t.ok(source.includes('if (result->has_addr)'), 'conditional decode checks has_')
+  t.ok(source.includes('ns1_addr_preencode(&_inner, &value->addr)'), 'inner preencode conditional')
+  t.ok(source.includes('ns1_addr_encode(state, &value->addr)'), 'inner encode conditional')
+  t.ok(source.includes('ns1_addr_decode(&_inner, &result->addr)'), 'inner decode conditional')
+})
+
+test('required inline nested struct - direct encode/decode calls', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'meta', compact: true, fields: [{ name: 'version', type: 'uint', required: true }] })
+  ns.register({
+    name: 'packet',
+    fields: [
+      { name: 'id', type: 'uint', required: true },
+      { name: 'meta', type: '@ns1/meta', required: true, inline: true }
+    ]
+  })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('ns1_meta_t meta;'), 'inline nested struct field in struct decl')
+  t.ok(!header.includes('bool has_meta;'), 'no has_ for required inline nested struct')
+  t.ok(source.includes('ns1_meta_preencode(state, &value->meta)'), 'direct preencode call')
+  t.ok(source.includes('ns1_meta_encode(state, &value->meta)'), 'direct encode call')
+  t.ok(source.includes('ns1_meta_decode(state, &result->meta)'), 'direct decode call')
+  t.ok(!source.includes('_blob'), 'no blob encoding for inline struct')
+})
+
+test('optional inline nested struct - has_ flag and conditional direct calls', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'meta', compact: true, fields: [{ name: 'version', type: 'uint', required: true }] })
+  ns.register({
+    name: 'packet',
+    fields: [
+      { name: 'id', type: 'uint', required: true },
+      { name: 'meta', type: '@ns1/meta', inline: true }
+    ]
+  })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('bool has_meta;'), 'has_ flag for optional inline nested struct')
+  t.ok(header.includes('ns1_meta_t meta;'), 'nested struct field in struct decl')
+  t.ok(source.includes('if (value->has_meta)'), 'conditional encode checks has_')
+  t.ok(source.includes('if (result->has_meta)'), 'conditional decode checks has_')
+  t.ok(source.includes('ns1_meta_preencode(state, &value->meta)'), 'conditional preencode call')
+  t.ok(source.includes('ns1_meta_encode(state, &value->meta)'), 'conditional encode call')
+  t.ok(source.includes('ns1_meta_decode(state, &result->meta)'), 'conditional decode call')
+  t.ok(!source.includes('_blob'), 'no blob encoding for inline struct')
+})
+
 test('unsupported type throws', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')

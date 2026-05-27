@@ -120,8 +120,184 @@ function makeLit(info) {
             : `${v}ULL`
 }
 
+function strView(s) {
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+    .replace(/\0/g, '\\0')
+  const len = Buffer.byteLength(s, 'utf8')
+  return `(utf8_string_view_t){ (const utf8_t *)"${escaped}", ${len} }`
+}
+
+function toStr(v) {
+  return typeof v === 'string' ? v : JSON.stringify(v)
+}
+
 function primaryType(schema) {
-  return [...schema.types.values()].find((t) => t.isStruct && t.fields.length > 0)
+  const structs = [...schema.types.values()].filter((t) => t.isStruct && t.fields.length > 0)
+  return structs[structs.length - 1]
+}
+
+function setField(lines, prefix, f, val) {
+  const cField = toCName(f.name)
+  const base = resolveBase(f.type)
+  const fullPath = `${prefix}${cField}`
+
+  if (f.array) return
+
+  if (base.isStruct) {
+    if (!f.required) {
+      if (val !== null && val !== undefined) {
+        lines.push(`    orig.${prefix}has_${cField} = true;`)
+        for (const sf of base.fields) setField(lines, `${fullPath}.`, sf, val[sf.name])
+      } else {
+        lines.push(`    orig.${prefix}has_${cField} = false;`)
+      }
+    } else {
+      for (const sf of base.fields) setField(lines, `${fullPath}.`, sf, val[sf.name])
+    }
+    return
+  }
+
+  const info = typeInfo(base.name)
+  const isFixed = fixedSize(base.name) > 0
+  const { isBuffer, isString } = info
+  const lit = makeLit(info)
+
+  if (!f.required) {
+    if (val !== null && val !== undefined) {
+      lines.push(`    orig.${prefix}has_${cField} = true;`)
+      if (isFixed) {
+        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        lines.push(
+          `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
+        )
+      } else if (isBuffer) {
+        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        if (bytes.length === 0) {
+          lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
+        } else {
+          lines.push(
+            `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${fullPath} = (uint8_t *)_b; orig.${fullPath}_len = sizeof(_b); }`
+          )
+        }
+      } else if (isString) {
+        lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+      } else {
+        lines.push(`    orig.${fullPath} = ${lit(val)};`)
+      }
+    } else {
+      lines.push(`    orig.${prefix}has_${cField} = false;`)
+    }
+  } else {
+    if (val === null || val === undefined) {
+      throw new Error(`fixture has null value for required field '${f.name}' at '${prefix}'`)
+    }
+    if (isFixed) {
+      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      lines.push(
+        `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
+      )
+    } else if (isBuffer) {
+      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      if (bytes.length === 0) {
+        lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
+      } else {
+        lines.push(
+          `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${fullPath} = (uint8_t *)_b; orig.${fullPath}_len = sizeof(_b); }`
+        )
+      }
+    } else if (isString) {
+      lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+    } else {
+      lines.push(`    orig.${fullPath} = ${lit(val)};`)
+    }
+  }
+}
+
+function compareField(lines, prefix, f, val) {
+  const cField = toCName(f.name)
+  const base = resolveBase(f.type)
+  const fullPath = `${prefix}${cField}`
+
+  if (f.array) return
+
+  if (base.isStruct) {
+    if (!f.required) {
+      if (val !== null && val !== undefined) {
+        lines.push(`    assert(dec.${prefix}has_${cField} == true);`)
+        for (const sf of base.fields) compareField(lines, `${fullPath}.`, sf, val[sf.name])
+      } else {
+        lines.push(`    assert(dec.${prefix}has_${cField} == false);`)
+      }
+    } else {
+      for (const sf of base.fields) compareField(lines, `${fullPath}.`, sf, val[sf.name])
+    }
+    return
+  }
+
+  const info = typeInfo(base.name)
+  const isFixed = fixedSize(base.name) > 0
+  const { isBuffer, isString } = info
+  const lit = makeLit(info)
+
+  if (!f.required) {
+    if (val !== null && val !== undefined) {
+      lines.push(`    assert(dec.${prefix}has_${cField} == true);`)
+      if (isFixed) {
+        lines.push(
+          `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
+        )
+      } else if (isBuffer) {
+        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
+        if (bytes.length > 0) {
+          lines.push(
+            `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, orig.${fullPath}_len) == 0);`
+          )
+        }
+      } else if (isString) {
+        const len = Buffer.byteLength(String(val), 'utf8')
+        lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
+        if (len > 0) {
+          lines.push(
+            `    assert(memcmp(dec.${fullPath}.data, orig.${fullPath}.data, orig.${fullPath}.len) == 0);`
+          )
+        }
+      } else {
+        lines.push(`    assert(dec.${fullPath} == ${lit(val)});`)
+      }
+    } else {
+      lines.push(`    assert(dec.${prefix}has_${cField} == false);`)
+    }
+  } else {
+    if (isFixed) {
+      lines.push(
+        `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
+      )
+    } else if (isBuffer) {
+      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
+      if (bytes.length > 0) {
+        lines.push(
+          `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, orig.${fullPath}_len) == 0);`
+        )
+      }
+    } else if (isString) {
+      const len = Buffer.byteLength(String(val), 'utf8')
+      lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
+      if (len > 0) {
+        lines.push(
+          `    assert(memcmp(dec.${fullPath}.data, orig.${fullPath}.data, orig.${fullPath}.len) == 0);`
+        )
+      }
+    } else {
+      lines.push(`    assert(dec.${fullPath} == ${lit(val)});`)
+    }
+  }
 }
 
 function generateRoundTrip(name, type, testValue) {
@@ -129,75 +305,7 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`  {`)
   lines.push(`    ${name}_t orig;`)
   lines.push(`    memset(&orig, 0, sizeof(orig));`)
-  for (const f of type.fields) {
-    const cField = toCName(f.name)
-    const val = testValue[f.name]
-    const info = typeInfo(resolveBase(f.type).name)
-    const isFixed = fixedSize(resolveBase(f.type).name) > 0
-    const { isBuffer, isString } = info
-    const lit = makeLit(info)
-    const toStr = (v) => (typeof v === 'string' ? v : JSON.stringify(v))
-    const strView = (s) => {
-      const escaped = s
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t')
-        .replace(/\0/g, '\\0')
-      const len = Buffer.byteLength(s, 'utf8')
-      return `(utf8_string_view_t){ (const utf8_t *)"${escaped}", ${len} }`
-    }
-    if (!f.required) {
-      if (val !== null && val !== undefined) {
-        lines.push(`    orig.has_${cField} = true;`)
-        if (isFixed) {
-          const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-          lines.push(
-            `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
-          )
-        } else if (isBuffer) {
-          const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-          if (bytes.length === 0) {
-            lines.push(`    orig.${cField} = (uint8_t *)""; orig.${cField}_len = 0;`)
-          } else {
-            lines.push(
-              `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${cField} = (uint8_t *)_b; orig.${cField}_len = sizeof(_b); }`
-            )
-          }
-        } else if (isString) {
-          lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
-        } else {
-          lines.push(`    orig.${cField} = ${lit(val)};`)
-        }
-      } else {
-        lines.push(`    orig.has_${cField} = false;`)
-      }
-    } else {
-      if (val === null || val === undefined) {
-        throw new Error(`fixture has null value for required field '${f.name}' in type '${name}'`)
-      }
-      if (isFixed) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-        lines.push(
-          `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${cField}, _b, sizeof(_b)); }`
-        )
-      } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-        if (bytes.length === 0) {
-          lines.push(`    orig.${cField} = (uint8_t *)""; orig.${cField}_len = 0;`)
-        } else {
-          lines.push(
-            `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${cField} = (uint8_t *)_b; orig.${cField}_len = sizeof(_b); }`
-          )
-        }
-      } else if (isString) {
-        lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
-      } else {
-        lines.push(`    orig.${cField} = ${lit(val)};`)
-      }
-    }
-  }
+  for (const f of type.fields) setField(lines, '', f, testValue[f.name])
   lines.push(`    compact_state_t st = {0, 0};`)
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
   lines.push(`    st.buffer = malloc(st.end);`)
@@ -206,64 +314,7 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`    ${name}_t dec;`)
   lines.push(`    memset(&dec, 0, sizeof(dec));`)
   lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
-  for (const f of type.fields) {
-    const cField = toCName(f.name)
-    const val = testValue[f.name]
-    const info = typeInfo(resolveBase(f.type).name)
-    const isFixed = fixedSize(resolveBase(f.type).name) > 0
-    const { isBuffer, isString } = info
-    const lit = makeLit(info)
-    if (!f.required) {
-      if (val !== null && val !== undefined) {
-        lines.push(`    assert(dec.has_${cField} == true);`)
-        if (isFixed) {
-          lines.push(
-            `    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`
-          )
-        } else if (isBuffer) {
-          const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-          lines.push(`    assert(dec.${cField}_len == orig.${cField}_len);`)
-          if (bytes.length > 0) {
-            lines.push(
-              `    assert(memcmp(dec.${cField}, orig.${cField}, orig.${cField}_len) == 0);`
-            )
-          }
-        } else if (isString) {
-          const len = Buffer.byteLength(String(val), 'utf8')
-          lines.push(`    assert(dec.${cField}.len == orig.${cField}.len);`)
-          if (len > 0) {
-            lines.push(
-              `    assert(memcmp(dec.${cField}.data, orig.${cField}.data, orig.${cField}.len) == 0);`
-            )
-          }
-        } else {
-          lines.push(`    assert(dec.${cField} == ${lit(val)});`)
-        }
-      } else {
-        lines.push(`    assert(dec.has_${cField} == false);`)
-      }
-    } else {
-      if (isFixed) {
-        lines.push(`    assert(memcmp(dec.${cField}, orig.${cField}, sizeof(dec.${cField})) == 0);`)
-      } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
-        lines.push(`    assert(dec.${cField}_len == orig.${cField}_len);`)
-        if (bytes.length > 0) {
-          lines.push(`    assert(memcmp(dec.${cField}, orig.${cField}, orig.${cField}_len) == 0);`)
-        }
-      } else if (isString) {
-        const len = Buffer.byteLength(String(val), 'utf8')
-        lines.push(`    assert(dec.${cField}.len == orig.${cField}.len);`)
-        if (len > 0) {
-          lines.push(
-            `    assert(memcmp(dec.${cField}.data, orig.${cField}.data, orig.${cField}.len) == 0);`
-          )
-        }
-      } else {
-        lines.push(`    assert(dec.${cField} == ${lit(val)});`)
-      }
-    }
-  }
+  for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`  }`)
   return lines
