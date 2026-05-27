@@ -156,7 +156,11 @@ function setField(lines, prefix, f, val) {
       }
       lines.push(`    orig.${prefix}has_${cField} = true;`)
     } else {
-      if (isNull) throw new Error(`fixture has null value for required array field '${f.name}' at '${prefix}'`)
+      if (isNull) {
+        throw new Error(
+          `fixture has null value for required array field '${f.name}' at '${prefix}'`
+        )
+      }
     }
     if (base.isStruct || arrVal.length === 0) {
       lines.push(`    orig.${fullPath} = NULL; orig.${fullPath}_len = 0;`)
@@ -190,7 +194,9 @@ function setField(lines, prefix, f, val) {
       }
     } else {
       if (val === null || val === undefined) {
-        throw new Error(`fixture has null value for required struct field '${f.name}' at '${prefix}'`)
+        throw new Error(
+          `fixture has null value for required struct field '${f.name}' at '${prefix}'`
+        )
       }
       for (const sf of base.fields) setField(lines, `${fullPath}.`, sf, val[sf.name])
     }
