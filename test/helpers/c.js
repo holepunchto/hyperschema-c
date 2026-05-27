@@ -386,7 +386,7 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
   for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
-  if (type.fields.some((f) => f.array)) lines.push(`    ${name}_destroy(&dec);`)
+  lines.push(`    ${name}_destroy(&dec);`)
   lines.push(`  }`)
   return lines
 }

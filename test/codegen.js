@@ -389,6 +389,52 @@ test('int56 field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_int56(state, &result->value)'), 'decode int56')
 })
 
+test('_destroy always generated - noop for struct with no allocations', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({ name: 'point', fields: [{ name: 'x', type: 'uint', required: true }] })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('ns1_point_destroy'), '_destroy declared in header')
+  t.ok(source.includes('void\nns1_point_destroy'), '_destroy implemented in source')
+  t.ok(!source.includes('free('), 'no free call in noop destroy')
+})
+
+test('_destroy on outer struct chains into nested struct _destroy', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'inner',
+    fields: [{ name: 'items', type: 'uint', required: true, array: true }]
+  })
+  ns.register({
+    name: 'outer',
+    fields: [{ name: 'child', type: '@ns1/inner', required: true }]
+  })
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('ns1_outer_destroy'), 'outer _destroy declared')
+  t.ok(source.includes('ns1_inner_destroy(&result->child)'), 'outer _destroy calls inner _destroy')
+  t.ok(source.includes('#include <stdlib.h>'), 'stdlib.h included when nested struct has arrays')
+})
+
+test('outer decode uses goto fail when nested struct needs destroy', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  const ns = schema.namespace('ns1')
+  ns.register({
+    name: 'inner',
+    fields: [{ name: 'items', type: 'uint', required: true, array: true }]
+  })
+  ns.register({
+    name: 'outer',
+    fields: [{ name: 'child', type: '@ns1/inner', required: true }]
+  })
+  const { source } = schema.toCode()
+
+  t.ok(source.includes('fail:'), 'fail label in outer decode')
+  t.ok(source.includes('ns1_outer_destroy(result)'), 'fail label calls outer _destroy')
+})
+
 test('required non-inline nested struct - struct decl and blob encode/decode', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
