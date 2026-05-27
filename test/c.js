@@ -31,6 +31,13 @@ for (const fix of fixtures) {
 
   if (!primaryType(schema)) continue
 
+  const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
+  const firstVal = testData.values[0]
+  if (Array.isArray(firstVal)) continue // array-alias fixture
+  const fieldNames = new Set(primaryType(schema).fields.map((f) => f.name))
+  const valKeys = Object.keys(firstVal)
+  if (valKeys.length > 0 && !valKeys.some((k) => fieldNames.has(k))) continue // record/map fixture
+
   test(`fixture ${fix} - compile and round-trip`, (t) => {
     const result = runC(schema, generateMainC(schema, fixtureDir))
     t.ok(result.ok, result.ok ? 'compile and run' : `compile/run failed:\n${result.stderr}`)

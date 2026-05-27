@@ -112,9 +112,21 @@ function generateRoundTrip(name, type, testValue) {
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
-    const { isBuffer } = info
+    const { isBuffer, isString } = info
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
+    const toStr = (v) => (typeof v === 'string' ? v : JSON.stringify(v))
+    const strView = (s) => {
+      const escaped = s
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+        .replace(/\0/g, '\\0')
+      const len = Buffer.byteLength(s, 'utf8')
+      return `(utf8_string_view_t){ (const utf8_t *)"${escaped}", ${len} }`
+    }
     if (!f.required) {
       if (val !== null && val !== undefined) {
         lines.push(`    orig.has_${cField} = true;`)
@@ -132,6 +144,8 @@ function generateRoundTrip(name, type, testValue) {
               `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${cField} = (uint8_t *)_b; orig.${cField}_len = sizeof(_b); }`
             )
           }
+        } else if (isString) {
+          lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
         } else {
           lines.push(`    orig.${cField} = ${lit(val)};`)
         }
@@ -156,6 +170,8 @@ function generateRoundTrip(name, type, testValue) {
             `    { static const uint8_t _b[] = {${[...bytes]}}; orig.${cField} = (uint8_t *)_b; orig.${cField}_len = sizeof(_b); }`
           )
         }
+      } else if (isString) {
+        lines.push(`    orig.${cField} = ${strView(toStr(val))};`)
       } else {
         lines.push(`    orig.${cField} = ${lit(val)};`)
       }
@@ -174,7 +190,7 @@ function generateRoundTrip(name, type, testValue) {
     const val = testValue[f.name]
     const info = typeInfo(resolveBase(f.type).name)
     const isFixed = fixedSize(resolveBase(f.type).name) > 0
-    const { isBuffer } = info
+    const { isBuffer, isString } = info
     const lit = (v) =>
       info.cType === 'bool' ? (v ? 'true' : 'false') : info.signed ? `${v}LL` : `${v}ULL`
     if (!f.required) {
@@ -192,6 +208,14 @@ function generateRoundTrip(name, type, testValue) {
               `    assert(memcmp(dec.${cField}, orig.${cField}, orig.${cField}_len) == 0);`
             )
           }
+        } else if (isString) {
+          const len = Buffer.byteLength(String(val), 'utf8')
+          lines.push(`    assert(dec.${cField}.len == orig.${cField}.len);`)
+          if (len > 0) {
+            lines.push(
+              `    assert(memcmp(dec.${cField}.data, orig.${cField}.data, orig.${cField}.len) == 0);`
+            )
+          }
         } else {
           lines.push(`    assert(dec.${cField} == ${lit(val)});`)
         }
@@ -206,6 +230,14 @@ function generateRoundTrip(name, type, testValue) {
         lines.push(`    assert(dec.${cField}_len == orig.${cField}_len);`)
         if (bytes.length > 0) {
           lines.push(`    assert(memcmp(dec.${cField}, orig.${cField}, orig.${cField}_len) == 0);`)
+        }
+      } else if (isString) {
+        const len = Buffer.byteLength(String(val), 'utf8')
+        lines.push(`    assert(dec.${cField}.len == orig.${cField}.len);`)
+        if (len > 0) {
+          lines.push(
+            `    assert(memcmp(dec.${cField}.data, orig.${cField}.data, orig.${cField}.len) == 0);`
+          )
         }
       } else {
         lines.push(`    assert(dec.${cField} == ${lit(val)});`)
