@@ -120,7 +120,9 @@ function generateRoundTrip(name, type, testValue) {
     }
     const lit = (v) =>
       info.cType === 'bool'
-        ? v ? 'true' : 'false'
+        ? v
+          ? 'true'
+          : 'false'
         : info.cType === 'float'
           ? floatLit(v, 'f')
           : info.cType === 'double'
@@ -211,7 +213,9 @@ function generateRoundTrip(name, type, testValue) {
     }
     const lit = (v) =>
       info.cType === 'bool'
-        ? v ? 'true' : 'false'
+        ? v
+          ? 'true'
+          : 'false'
         : info.cType === 'float'
           ? floatLit(v, 'f')
           : info.cType === 'double'
