@@ -402,7 +402,10 @@ test('required non-inline nested struct - struct decl and blob encode/decode', (
   t.ok(header.includes('ns1_inner_t n;'), 'nested struct field in struct decl')
   t.ok(!header.includes('bool has_n;'), 'no has_ for required nested struct')
   t.ok(source.includes('ns1_inner_preencode(&_inner, &value->n)'), 'inner preencode in preencode')
-  t.ok(source.includes('compact_preencode_uint8array(state, NULL, _inner.end)'), 'blob length in preencode')
+  t.ok(
+    source.includes('compact_preencode_uint8array(state, NULL, _inner.end)'),
+    'blob length in preencode'
+  )
   t.ok(source.includes('ns1_inner_preencode(&_inner, &value->n)'), 'inner preencode in encode')
   t.ok(source.includes('compact_encode_uint(state, (uintmax_t)_inner.end)'), 'blob length encoded')
   t.ok(source.includes('ns1_inner_encode(state, &value->n)'), 'inner encode in encode')
@@ -436,7 +439,11 @@ test('optional non-inline nested struct - has_ flag and conditional encode/decod
 test('required inline nested struct - direct encode/decode calls', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
-  ns.register({ name: 'meta', compact: true, fields: [{ name: 'version', type: 'uint', required: true }] })
+  ns.register({
+    name: 'meta',
+    compact: true,
+    fields: [{ name: 'version', type: 'uint', required: true }]
+  })
   ns.register({
     name: 'packet',
     fields: [
@@ -457,7 +464,11 @@ test('required inline nested struct - direct encode/decode calls', (t) => {
 test('optional inline nested struct - has_ flag and conditional direct calls', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
-  ns.register({ name: 'meta', compact: true, fields: [{ name: 'version', type: 'uint', required: true }] })
+  ns.register({
+    name: 'meta',
+    compact: true,
+    fields: [{ name: 'version', type: 'uint', required: true }]
+  })
   ns.register({
     name: 'packet',
     fields: [
