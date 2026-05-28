@@ -9,7 +9,7 @@ test('required uint only - header', (t) => {
 
   t.ok(header.includes('#ifndef NS27_SCHEMA_H'), 'namespaced include guard')
   t.ok(header.includes('typedef struct ns27_counter_s {'), 'struct typedef')
-  t.ok(header.includes('uintmax_t value;'), 'uint field')
+  t.ok(header.includes('uint64_t value;'), 'uint field')
   t.ok(!header.includes('bool has_'), 'no has_ for required fields')
   t.ok(header.includes('ns27_counter_preencode'), 'preencode declaration')
   t.ok(header.includes('ns27_counter_encode'), 'encode declaration')
@@ -40,10 +40,10 @@ test('optional uint - has_ and flags', (t) => {
   const { header, source } = schema.toCode()
 
   t.ok(header.includes('bool has_count;'), 'has_ field in struct')
-  t.ok(source.includes('uintmax_t flags = 0;'), 'flags variable in encode')
-  t.ok(source.includes('flags |= ((uintmax_t)1 << 0)'), 'flag bit set for count')
+  t.ok(source.includes('uint64_t flags = 0;'), 'flags variable in encode')
+  t.ok(source.includes('flags |= ((uint64_t)1 << 0)'), 'flag bit set for count')
   t.ok(
-    source.includes('result->has_count = (flags & ((uintmax_t)1 << 0)) != 0'),
+    source.includes('result->has_count = (flags & ((uint64_t)1 << 0)) != 0'),
     'flag bit read in decode'
   )
   t.ok(source.includes('if (value->has_count)'), 'conditional encode')
@@ -61,8 +61,8 @@ test('int field - correct C type and functions', (t) => {
     ]
   })
   const { header, source } = schema.toCode()
-  t.ok(header.includes('intmax_t x;'), 'int field is intmax_t')
-  t.ok(header.includes('intmax_t y;'), 'int field is intmax_t')
+  t.ok(header.includes('int64_t x;'), 'int field is int64_t')
+  t.ok(header.includes('int64_t y;'), 'int field is int64_t')
   t.ok(source.includes('compact_preencode_int(state, value->x)'), 'preencode int')
   t.ok(source.includes('compact_encode_int(state, value->x)'), 'encode int')
   t.ok(source.includes('compact_decode_int(state, &result->x)'), 'decode int')
@@ -220,7 +220,7 @@ test('required array of uint - correct C members and encode/decode', (t) => {
     fields: [{ name: 'items', type: 'uint', required: true, array: true }]
   })
   const { header, source } = schema.toCode()
-  t.ok(header.includes('uintmax_t *items; /* array */'), 'array pointer field')
+  t.ok(header.includes('uint64_t *items; /* array */'), 'array pointer field')
   t.ok(header.includes('size_t items_len;'), 'array length field')
   t.ok(!header.includes('bool has_items'), 'no has_ for required array')
   t.ok(source.includes('compact_preencode_uint(state, value->items_len)'), 'preencode length')
@@ -253,7 +253,7 @@ test('optional array of uint - has_ flag and conditional encode/decode', (t) => 
   })
   const { header, source } = schema.toCode()
   t.ok(header.includes('bool has_values;'), 'has_ flag for optional array')
-  t.ok(source.includes('uintmax_t flags = 0;'), 'flags variable')
+  t.ok(source.includes('uint64_t flags = 0;'), 'flags variable')
   t.ok(source.includes('if (value->has_values)'), 'conditional encode')
   t.ok(source.includes('if (result->has_values)'), 'conditional decode')
 })
@@ -453,7 +453,7 @@ test('required non-inline nested struct - struct decl and blob encode/decode', (
     'blob length in preencode'
   )
   t.ok(source.includes('ns1_inner_preencode(&_inner, &value->n)'), 'inner preencode in encode')
-  t.ok(source.includes('compact_encode_uint(state, (uintmax_t)_inner.end)'), 'blob length encoded')
+  t.ok(source.includes('compact_encode_uint(state, (uint64_t)_inner.end)'), 'blob length encoded')
   t.ok(source.includes('ns1_inner_encode(state, &value->n)'), 'inner encode in encode')
   t.ok(source.includes('compact_decode_uint8array(state, &_blob, &_blob_len)'), 'blob decoded')
   t.ok(source.includes('compact_state_t _inner = {0, _blob_len, _blob}'), 'inner state from blob')
