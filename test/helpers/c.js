@@ -22,7 +22,7 @@ function generateWorkspaceCMake(hyperschema) {
   if (!namespaces.length) {
     throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
   }
-  const target = namespaces.join('_')
+  const target = namespaces.join('_') + '_schema'
   return [
     'cmake_minimum_required(VERSION 4.0)',
     '',
