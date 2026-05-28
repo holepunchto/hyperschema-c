@@ -19,17 +19,7 @@ const CMAKE_FETCH = path.join(__dirname, '../../node_modules/cmake-fetch').repla
 const TIMEOUT = 120000
 
 function generateWorkspaceCMake(hyperschema) {
-  const structs = []
-  for (let i = 0; i < hyperschema.schema.length; i++) {
-    const fqn = hyperschema.typesByPosition.get(i)
-    const type = hyperschema.resolve(fqn)
-    if (type.isStruct) structs.push(type)
-  }
-  const namespaces = [...new Set(structs.map((t) => toCName(t.namespace)))]
-  if (!namespaces.length) {
-    throw new Error('hyperschema-c: schema has no structs — cannot derive CMake target name')
-  }
-  const target = namespaces.join('_') + '_schema'
+  const target = targetName(hyperschema)
   return [
     'cmake_minimum_required(VERSION 4.0)',
     '',
