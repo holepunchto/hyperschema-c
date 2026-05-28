@@ -2,7 +2,14 @@ const { spawnSync } = require('child_process')
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const { toCName, structName, typeInfo, resolveBase, fixedSize } = require('../../lib/codegen')
+const {
+  toCName,
+  structName,
+  typeInfo,
+  resolveBase,
+  fixedSize,
+  targetName
+} = require('../../lib/codegen')
 const CHyperschema = require('../..')
 
 const WORKSPACE = path.join(__dirname, '../c-workspace')
@@ -396,12 +403,13 @@ function generateMainC(schema, fixtureDir) {
 
   const type = primaryType(schema)
   const name = structName(type)
+  const target = targetName(schema)
 
   const lines = [
     '#include <assert.h>',
     '#include <stdlib.h>',
     '#include <string.h>',
-    '#include "schema.h"',
+    `#include "${target}.h"`,
     '',
     'int main () {',
     '  int err;',

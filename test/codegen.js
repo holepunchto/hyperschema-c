@@ -20,7 +20,7 @@ test('required uint only - source', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '27'))
   const { source } = schema.toCode()
 
-  t.ok(source.includes('#include "schema.h"'), 'includes schema.h')
+  t.ok(source.includes('#include "ns27_schema.h"'), 'includes ns27_schema.h')
   t.ok(source.includes('compact_preencode_uint(state, value->value)'), 'preencode uint')
   t.ok(source.includes('compact_encode_uint(state, value->value)'), 'encode uint')
   t.ok(source.includes('compact_decode_uint(state, &result->value)'), 'decode uint')
