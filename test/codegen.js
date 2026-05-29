@@ -171,7 +171,7 @@ test('fixed64 field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_fixed64(state, result->data)'), 'decode fixed64 (no &)')
 })
 
-test('bool field - correct C type and functions', (t) => {
+test('bool field - encoded as a flag bit, not a separate byte', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
   ns.register({
@@ -181,9 +181,10 @@ test('bool field - correct C type and functions', (t) => {
   const { header, source } = schema.toCode()
   t.ok(header.includes('#include <stdbool.h>'), 'stdbool.h included for bool field')
   t.ok(header.includes('bool active;'), 'bool field type')
-  t.ok(source.includes('compact_preencode_bool(state, value->active)'), 'preencode bool')
-  t.ok(source.includes('compact_encode_bool(state, value->active)'), 'encode bool')
-  t.ok(source.includes('compact_decode_bool(state, &result->active)'), 'decode bool')
+  t.ok(!header.includes('has_active'), 'no presence bool: the value is the flag bit')
+  t.ok(source.includes('if (value->active) flags |='), 'flag bit set from the value')
+  t.ok(!source.includes('compact_encode_bool'), 'no separate bool byte on the wire')
+  t.ok(source.includes('result->active = (flags &'), 'decoded straight from the flag bit')
 })
 
 test('buffer field - correct C members and functions', (t) => {
@@ -603,4 +604,32 @@ test('unsupported type throws', (t) => {
     fields: [{ name: 'n', type: 'lexint', required: true }]
   })
   t.exception(() => schema.toCode(), { code: 'UNSUPPORTED_TYPE' })
+})
+
+test('numeric enum - header typedef', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '21'))
+  const { header } = schema.toCode()
+
+  t.ok(header.includes('typedef enum ns21_color_e {'), 'enum typedef')
+  t.ok(header.includes('NS21_COLOR_RED = 1'), 'first constant starts at offset')
+  t.ok(header.includes('NS21_COLOR_GREEN = 2'), 'constants increment')
+  t.ok(header.includes('NS21_COLOR_BLUE = 3'), 'last constant')
+  t.ok(header.includes('} ns21_color_t;'), 'enum C type name')
+  t.ok(header.includes('ns21_color_t color;'), 'struct field uses enum type')
+})
+
+test('numeric enum - encodes as uint', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '21'))
+  const { source } = schema.toCode()
+
+  t.ok(source.includes('compact_encode_uint(state, (uint64_t)value->color)'), 'encode via uint')
+  t.ok(source.includes('(ns21_color_t)_e'), 'decode casts uint back to enum')
+})
+
+test('string enum - same uint wire format as numeric', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '22'))
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('NS22_STATUS_PENDING = 1'), 'string enum is still numeric in C')
+  t.ok(source.includes('compact_encode_uint(state, (uint64_t)value->status)'), 'encode via uint')
 })
