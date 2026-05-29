@@ -8,7 +8,8 @@ const {
   typeInfo,
   resolveBase,
   fixedSize,
-  targetName
+  targetName,
+  enumConstName
 } = require('../../lib/codegen')
 const CHyperschema = require('../..')
 
@@ -133,6 +134,14 @@ function toStr(v) {
   return typeof v === 'string' ? v : JSON.stringify(v)
 }
 
+// Fixture values are the JS-facing enum representation: the integer for numeric
+// enums, the key string for string enums. Both map to the same generated C
+// constant (e.g. NS21_COLOR_RED), which is what we assign and compare against.
+function enumConst(type, val) {
+  const key = type.strings ? val : type.enum[val - type.offset].key
+  return enumConstName(type, key)
+}
+
 function primaryType(schema) {
   const structs = [...schema.types.values()].filter((t) => t.isStruct && t.fields.length > 0)
   return structs[structs.length - 1]
@@ -197,6 +206,18 @@ function setField(lines, prefix, f, val) {
       }
       for (const sf of base.fields) setField(lines, `${fullPath}.`, sf, val[sf.name])
     }
+    return
+  }
+
+  if (base.isEnum) {
+    const isNull = val === null || val === undefined
+    if (!f.required) {
+      lines.push(`    orig.${prefix}has_${cField} = ${isNull ? 'false' : 'true'};`)
+      if (isNull) return
+    } else if (isNull) {
+      throw new Error(`fixture has null value for required enum field '${f.name}' at '${prefix}'`)
+    }
+    lines.push(`    orig.${fullPath} = ${enumConst(base, val)};`)
     return
   }
 
@@ -303,6 +324,16 @@ function compareField(lines, prefix, f, val) {
     } else {
       for (const sf of base.fields) compareField(lines, `${fullPath}.`, sf, val[sf.name])
     }
+    return
+  }
+
+  if (base.isEnum) {
+    const isNull = val === null || val === undefined
+    if (!f.required) {
+      lines.push(`    assert(dec.${prefix}has_${cField} == ${isNull ? 'false' : 'true'});`)
+      if (isNull) return
+    }
+    lines.push(`    assert(dec.${fullPath} == ${enumConst(base, val)});`)
     return
   }
 
