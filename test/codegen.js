@@ -171,7 +171,7 @@ test('fixed64 field - correct C type and functions', (t) => {
   t.ok(source.includes('compact_decode_fixed64(state, result->data)'), 'decode fixed64 (no &)')
 })
 
-test('bool field - correct C type and functions', (t) => {
+test('bool field - encoded as a flag bit, not a separate byte', (t) => {
   const schema = new CHyperschema(null, { versioned: false })
   const ns = schema.namespace('ns1')
   ns.register({
@@ -181,9 +181,10 @@ test('bool field - correct C type and functions', (t) => {
   const { header, source } = schema.toCode()
   t.ok(header.includes('#include <stdbool.h>'), 'stdbool.h included for bool field')
   t.ok(header.includes('bool active;'), 'bool field type')
-  t.ok(source.includes('compact_preencode_bool(state, value->active)'), 'preencode bool')
-  t.ok(source.includes('compact_encode_bool(state, value->active)'), 'encode bool')
-  t.ok(source.includes('compact_decode_bool(state, &result->active)'), 'decode bool')
+  t.ok(!header.includes('has_active'), 'no presence bool: the value is the flag bit')
+  t.ok(source.includes('if (value->active) flags |='), 'flag bit set from the value')
+  t.ok(!source.includes('compact_encode_bool'), 'no separate bool byte on the wire')
+  t.ok(source.includes('result->active = (flags &'), 'decoded straight from the flag bit')
 })
 
 test('buffer field - correct C members and functions', (t) => {

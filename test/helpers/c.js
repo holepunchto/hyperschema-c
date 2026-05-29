@@ -221,6 +221,12 @@ function setField(lines, prefix, f, val) {
     return
   }
 
+  // A scalar bool is a flag bit: no has_, the value itself sets the bit.
+  if (base.name === 'bool') {
+    lines.push(`    orig.${fullPath} = ${val ? 'true' : 'false'};`)
+    return
+  }
+
   const info = typeInfo(base.name)
   const isFixed = fixedSize(base.name) > 0
   const { isBuffer, isString } = info
@@ -334,6 +340,12 @@ function compareField(lines, prefix, f, val) {
       if (isNull) return
     }
     lines.push(`    assert(dec.${fullPath} == ${enumConst(base, val)});`)
+    return
+  }
+
+  // A scalar bool is a flag bit: the decoded value is the bit, no has_.
+  if (base.name === 'bool') {
+    lines.push(`    assert(dec.${fullPath} == ${val ? 'true' : 'false'});`)
     return
   }
 
