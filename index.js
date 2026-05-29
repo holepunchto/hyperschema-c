@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const Hyperschema = require('hyperschema')
 const generateC = require('./lib/codegen')
-const { generateCMake } = generateC
+const { generateCMake, targetName } = generateC
 
 class CHyperschema extends Hyperschema {
   toCode() {
@@ -18,21 +18,14 @@ class CHyperschema extends Hyperschema {
     fs.mkdirSync(root, { recursive: true })
 
     const { header, source } = hyperschema.toCode()
+    const target = targetName(hyperschema)
+    const schemaJson = JSON.stringify(hyperschema.toJSON(), null, 2) + '\n'
+    const cmake = generateCMake(hyperschema)
 
-    fs.writeFileSync(
-      path.join(root, 'schema.json'),
-      JSON.stringify(hyperschema.toJSON(), null, 2) + '\n',
-      { encoding: 'utf-8' }
-    )
-    fs.writeFileSync(path.join(root, 'schema.h'), header, {
-      encoding: 'utf-8'
-    })
-    fs.writeFileSync(path.join(root, 'schema.c'), source, {
-      encoding: 'utf-8'
-    })
-    fs.writeFileSync(path.join(root, 'CMakeLists.txt'), generateCMake(hyperschema), {
-      encoding: 'utf-8'
-    })
+    fs.writeFileSync(path.join(root, 'schema.json'), schemaJson, { encoding: 'utf-8' })
+    fs.writeFileSync(path.join(root, `${target}.h`), header, { encoding: 'utf-8' })
+    fs.writeFileSync(path.join(root, `${target}.c`), source, { encoding: 'utf-8' })
+    fs.writeFileSync(path.join(root, 'CMakeLists.txt'), cmake, { encoding: 'utf-8' })
   }
 }
 

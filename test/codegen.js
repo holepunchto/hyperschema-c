@@ -1,7 +1,39 @@
 const path = require('path')
 const test = require('brittle')
 const CHyperschema = require('..')
+const { targetName } = require('../lib/codegen')
 const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/package')), 'fixtures')
+
+function buildSchema(namespaces) {
+  const schema = new CHyperschema(null, { versioned: false })
+  for (const ns of namespaces) {
+    schema
+      .namespace(ns)
+      .register({ name: 'item', fields: [{ name: 'value', type: 'uint', required: true }] })
+  }
+  return schema
+}
+
+test('targetName - single namespace', (t) => {
+  t.is(targetName(buildSchema(['ns1'])), 'ns1_schema')
+})
+
+test('targetName - multiple namespaces joined with underscores', (t) => {
+  t.is(targetName(buildSchema(['ns1', 'ns2'])), 'ns1_ns2_schema')
+})
+
+test('targetName - hyphenated namespace becomes snake_case', (t) => {
+  t.is(targetName(buildSchema(['my-ns'])), 'my_ns_schema')
+})
+
+test('targetName - camelCase namespace becomes snake_case', (t) => {
+  t.is(targetName(buildSchema(['myNs'])), 'my_ns_schema')
+})
+
+test('targetName - empty schema defaults to "schema"', (t) => {
+  const schema = new CHyperschema(null, { versioned: false })
+  t.is(targetName(schema), 'schema')
+})
 
 test('required uint only - header', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '27'))
@@ -20,7 +52,7 @@ test('required uint only - source', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '27'))
   const { source } = schema.toCode()
 
-  t.ok(source.includes('#include "schema.h"'), 'includes schema.h')
+  t.ok(source.includes('#include "ns27_schema.h"'), 'includes ns27_schema.h')
   t.ok(source.includes('compact_preencode_uint(state, value->value)'), 'preencode uint')
   t.ok(source.includes('compact_encode_uint(state, value->value)'), 'encode uint')
   t.ok(source.includes('compact_decode_uint(state, &result->value)'), 'decode uint')
