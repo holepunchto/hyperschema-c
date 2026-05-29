@@ -40,7 +40,10 @@ function generateWorkspaceCMake(hyperschema) {
     '  C_STANDARD 99',
     ')',
     '',
-    `target_link_libraries(schema_test PRIVATE ${target} compact)`,
+    // utf is linked explicitly: compact calls libutf inline helpers that only
+    // get inlined away in a release build. In a debug build they stay external,
+    // so utf's objects must be on the link line.
+    `target_link_libraries(schema_test PRIVATE ${target} compact utf)`,
     ''
   ].join('\n')
 }
@@ -52,7 +55,7 @@ function runC(hyperschema, mainC) {
 
   const shell = os.platform() === 'win32'
 
-  const generate = spawnSync(BARE_MAKE, ['generate'], {
+  const generate = spawnSync(BARE_MAKE, ['generate', '--debug'], {
     cwd: WORKSPACE,
     encoding: 'utf8',
     timeout: TIMEOUT,
@@ -482,12 +485,6 @@ function generateMainC(schema, fixtureDir) {
   const target = targetName(schema)
 
   const lines = [
-    // The build is a release build, which defines NDEBUG and turns assert()
-    // into a no-op. Re-arm it here so the round-trip and byte checks run.
-    // (A global debug build is not an option: libcompact's utf8.c references
-    // an inline symbol that only resolves once optimization inlines it, so an
-    // unoptimized build fails to link.)
-    '#undef NDEBUG',
     '#include <assert.h>',
     '#include <stdlib.h>',
     '#include <string.h>',
