@@ -40,7 +40,10 @@ function generateWorkspaceCMake(hyperschema) {
     '  C_STANDARD 99',
     ')',
     '',
-    `target_link_libraries(schema_test PRIVATE ${target} compact)`,
+    // utf is linked explicitly: compact calls libutf inline helpers that only
+    // get inlined away in a release build. In a debug build they stay external,
+    // so utf's objects must be on the link line.
+    `target_link_libraries(schema_test PRIVATE ${target} compact utf)`,
     ''
   ].join('\n')
 }
@@ -52,7 +55,7 @@ function runC(hyperschema, mainC) {
 
   const shell = os.platform() === 'win32'
 
-  const generate = spawnSync(BARE_MAKE, ['generate'], {
+  const generate = spawnSync(BARE_MAKE, ['generate', '--debug'], {
     cwd: WORKSPACE,
     encoding: 'utf8',
     timeout: TIMEOUT,
@@ -132,6 +135,27 @@ function strView(s) {
 
 function toStr(v) {
   return typeof v === 'string' ? v : JSON.stringify(v)
+}
+
+// A `string` field encodes its value verbatim; a `json` field encodes
+// JSON.stringify(value) — so a string-valued json field is wrapped in quotes.
+function wireStr(base, val) {
+  return base.name === 'json' ? JSON.stringify(val) : toStr(val)
+}
+
+// Fixture buffer values are { type: 'Buffer', data: [...] }. Node's Buffer.from
+// reverses that shape but Bare's does not, so normalize to a byte array by hand.
+function toBytes(val) {
+  if (val && val.type === 'Buffer' && Array.isArray(val.data)) return val.data
+  if (Array.isArray(val)) return val
+  return [...Buffer.from(val)]
+}
+
+// hyperschema sets an optional field's flag from the value's JS truthiness
+// (`m.field ? ...`), so "", 0, and null are all encoded as absent. Mirror that
+// here, otherwise the C bytes diverge from the canonical vectors.
+function jsTruthy(val) {
+  return !!val
 }
 
 // Fixture values are the JS-facing enum representation: the integer for numeric
@@ -221,21 +245,27 @@ function setField(lines, prefix, f, val) {
     return
   }
 
+  // A scalar bool is a flag bit: no has_, the value itself sets the bit.
+  if (base.name === 'bool') {
+    lines.push(`    orig.${fullPath} = ${val ? 'true' : 'false'};`)
+    return
+  }
+
   const info = typeInfo(base.name)
   const isFixed = fixedSize(base.name) > 0
   const { isBuffer, isString } = info
   const lit = makeLit(info)
 
   if (!f.required) {
-    if (val !== null && val !== undefined) {
+    if (jsTruthy(val)) {
       lines.push(`    orig.${prefix}has_${cField} = true;`)
       if (isFixed) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         lines.push(
           `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
         )
       } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         if (bytes.length === 0) {
           lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
         } else {
@@ -244,7 +274,7 @@ function setField(lines, prefix, f, val) {
           )
         }
       } else if (isString) {
-        lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+        lines.push(`    orig.${fullPath} = ${strView(wireStr(base, val))};`)
       } else {
         lines.push(`    orig.${fullPath} = ${lit(val)};`)
       }
@@ -256,12 +286,12 @@ function setField(lines, prefix, f, val) {
       throw new Error(`fixture has null value for required field '${f.name}' at '${prefix}'`)
     }
     if (isFixed) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       lines.push(
         `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
       )
     } else if (isBuffer) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       if (bytes.length === 0) {
         lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
       } else {
@@ -270,7 +300,7 @@ function setField(lines, prefix, f, val) {
         )
       }
     } else if (isString) {
-      lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+      lines.push(`    orig.${fullPath} = ${strView(wireStr(base, val))};`)
     } else {
       lines.push(`    orig.${fullPath} = ${lit(val)};`)
     }
@@ -337,20 +367,26 @@ function compareField(lines, prefix, f, val) {
     return
   }
 
+  // A scalar bool is a flag bit: the decoded value is the bit, no has_.
+  if (base.name === 'bool') {
+    lines.push(`    assert(dec.${fullPath} == ${val ? 'true' : 'false'});`)
+    return
+  }
+
   const info = typeInfo(base.name)
   const isFixed = fixedSize(base.name) > 0
   const { isBuffer, isString } = info
   const lit = makeLit(info)
 
   if (!f.required) {
-    if (val !== null && val !== undefined) {
+    if (jsTruthy(val)) {
       lines.push(`    assert(dec.${prefix}has_${cField} == true);`)
       if (isFixed) {
         lines.push(
           `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
         )
       } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
         if (bytes.length > 0) {
           lines.push(
@@ -358,7 +394,7 @@ function compareField(lines, prefix, f, val) {
           )
         }
       } else if (isString) {
-        const len = Buffer.byteLength(String(val), 'utf8')
+        const len = Buffer.byteLength(wireStr(base, val), 'utf8')
         lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
         if (len > 0) {
           lines.push(
@@ -377,7 +413,7 @@ function compareField(lines, prefix, f, val) {
         `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
       )
     } else if (isBuffer) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
       if (bytes.length > 0) {
         lines.push(
@@ -385,7 +421,7 @@ function compareField(lines, prefix, f, val) {
         )
       }
     } else if (isString) {
-      const len = Buffer.byteLength(String(val), 'utf8')
+      const len = Buffer.byteLength(wireStr(base, val), 'utf8')
       lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
       if (len > 0) {
         lines.push(
@@ -398,7 +434,15 @@ function compareField(lines, prefix, f, val) {
   }
 }
 
-function generateRoundTrip(name, type, testValue) {
+// Canonical vectors ship in two shapes: a hex string, or a JSON Buffer object.
+function expectedBytes(entry) {
+  if (typeof entry === 'string') return [...Buffer.from(entry, 'hex')]
+  if (entry && entry.type === 'Buffer') return entry.data
+  throw new Error(`unrecognized "encoded" fixture entry: ${JSON.stringify(entry)}`)
+}
+
+function generateRoundTrip(name, type, testValue, exp) {
+  const useCanonical = exp && exp.length > 0
   const lines = []
   lines.push(`  {`)
   lines.push(`    ${name}_t orig;`)
@@ -408,10 +452,24 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
   lines.push(`    st.buffer = malloc(st.end);`)
   lines.push(`    err = ${name}_encode(&st, &orig); assert(err == 0);`)
-  lines.push(`    st.start = 0;`)
+
+  // Encode direction: C bytes must equal the canonical vector produced by JS.
+  if (useCanonical) {
+    lines.push(`    static const uint8_t _exp[] = {${exp.join(', ')}};`)
+    lines.push(`    assert(st.end == sizeof(_exp));`)
+    lines.push(`    assert(memcmp(st.buffer, _exp, st.end) == 0);`)
+  }
+
   lines.push(`    ${name}_t dec;`)
   lines.push(`    memset(&dec, 0, sizeof(dec));`)
-  lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
+  // Decode direction: read the canonical bytes, not our own re-encoding.
+  if (useCanonical) {
+    lines.push(`    compact_state_t dst = {0, sizeof(_exp), (uint8_t *)_exp};`)
+    lines.push(`    err = ${name}_decode(&dst, &dec); assert(err == 0);`)
+  } else {
+    lines.push(`    st.start = 0;`)
+    lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
+  }
   for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`    ${name}_destroy(&dec);`)
@@ -437,8 +495,10 @@ function generateMainC(schema, fixtureDir) {
     ''
   ]
 
-  for (const testValue of testData.values) {
-    lines.push(...generateRoundTrip(name, type, testValue))
+  const encoded = testData.encoded || []
+  for (let i = 0; i < testData.values.length; i++) {
+    const exp = i < encoded.length ? expectedBytes(encoded[i]) : null
+    lines.push(...generateRoundTrip(name, type, testData.values[i], exp))
     lines.push('')
   }
 
