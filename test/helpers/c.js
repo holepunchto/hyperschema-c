@@ -398,7 +398,15 @@ function compareField(lines, prefix, f, val) {
   }
 }
 
-function generateRoundTrip(name, type, testValue) {
+// Canonical vectors ship in two shapes: a hex string, or a JSON Buffer object.
+function expectedBytes(entry) {
+  if (typeof entry === 'string') return [...Buffer.from(entry, 'hex')]
+  if (entry && entry.type === 'Buffer') return entry.data
+  throw new Error(`unrecognized "encoded" fixture entry: ${JSON.stringify(entry)}`)
+}
+
+function generateRoundTrip(name, type, testValue, exp) {
+  const useCanonical = exp && exp.length > 0
   const lines = []
   lines.push(`  {`)
   lines.push(`    ${name}_t orig;`)
@@ -408,10 +416,24 @@ function generateRoundTrip(name, type, testValue) {
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
   lines.push(`    st.buffer = malloc(st.end);`)
   lines.push(`    err = ${name}_encode(&st, &orig); assert(err == 0);`)
-  lines.push(`    st.start = 0;`)
+
+  // Encode direction: C bytes must equal the canonical vector produced by JS.
+  if (useCanonical) {
+    lines.push(`    static const uint8_t _exp[] = {${exp.join(', ')}};`)
+    lines.push(`    assert(st.end == sizeof(_exp));`)
+    lines.push(`    assert(memcmp(st.buffer, _exp, st.end) == 0);`)
+  }
+
   lines.push(`    ${name}_t dec;`)
   lines.push(`    memset(&dec, 0, sizeof(dec));`)
-  lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
+  // Decode direction: read the canonical bytes, not our own re-encoding.
+  if (useCanonical) {
+    lines.push(`    compact_state_t dst = {0, sizeof(_exp), (uint8_t *)_exp};`)
+    lines.push(`    err = ${name}_decode(&dst, &dec); assert(err == 0);`)
+  } else {
+    lines.push(`    st.start = 0;`)
+    lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
+  }
   for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`    ${name}_destroy(&dec);`)
@@ -427,6 +449,12 @@ function generateMainC(schema, fixtureDir) {
   const target = targetName(schema)
 
   const lines = [
+    // The build is a release build, which defines NDEBUG and turns assert()
+    // into a no-op. Re-arm it here so the round-trip and byte checks run.
+    // (A global debug build is not an option: libcompact's utf8.c references
+    // an inline symbol that only resolves once optimization inlines it, so an
+    // unoptimized build fails to link.)
+    '#undef NDEBUG',
     '#include <assert.h>',
     '#include <stdlib.h>',
     '#include <string.h>',
@@ -437,8 +465,10 @@ function generateMainC(schema, fixtureDir) {
     ''
   ]
 
-  for (const testValue of testData.values) {
-    lines.push(...generateRoundTrip(name, type, testValue))
+  const encoded = testData.encoded || []
+  for (let i = 0; i < testData.values.length; i++) {
+    const exp = i < encoded.length ? expectedBytes(encoded[i]) : null
+    lines.push(...generateRoundTrip(name, type, testData.values[i], exp))
     lines.push('')
   }
 
