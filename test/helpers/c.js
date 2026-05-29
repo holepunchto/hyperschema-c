@@ -134,6 +134,27 @@ function toStr(v) {
   return typeof v === 'string' ? v : JSON.stringify(v)
 }
 
+// A `string` field encodes its value verbatim; a `json` field encodes
+// JSON.stringify(value) — so a string-valued json field is wrapped in quotes.
+function wireStr(base, val) {
+  return base.name === 'json' ? JSON.stringify(val) : toStr(val)
+}
+
+// Fixture buffer values are { type: 'Buffer', data: [...] }. Node's Buffer.from
+// reverses that shape but Bare's does not, so normalize to a byte array by hand.
+function toBytes(val) {
+  if (val && val.type === 'Buffer' && Array.isArray(val.data)) return val.data
+  if (Array.isArray(val)) return val
+  return [...Buffer.from(val)]
+}
+
+// hyperschema sets an optional field's flag from the value's JS truthiness
+// (`m.field ? ...`), so "", 0, and null are all encoded as absent. Mirror that
+// here, otherwise the C bytes diverge from the canonical vectors.
+function jsTruthy(val) {
+  return !!val
+}
+
 // Fixture values are the JS-facing enum representation: the integer for numeric
 // enums, the key string for string enums. Both map to the same generated C
 // constant (e.g. NS21_COLOR_RED), which is what we assign and compare against.
@@ -221,21 +242,27 @@ function setField(lines, prefix, f, val) {
     return
   }
 
+  // A scalar bool is a flag bit: no has_, the value itself sets the bit.
+  if (base.name === 'bool') {
+    lines.push(`    orig.${fullPath} = ${val ? 'true' : 'false'};`)
+    return
+  }
+
   const info = typeInfo(base.name)
   const isFixed = fixedSize(base.name) > 0
   const { isBuffer, isString } = info
   const lit = makeLit(info)
 
   if (!f.required) {
-    if (val !== null && val !== undefined) {
+    if (jsTruthy(val)) {
       lines.push(`    orig.${prefix}has_${cField} = true;`)
       if (isFixed) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         lines.push(
           `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
         )
       } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         if (bytes.length === 0) {
           lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
         } else {
@@ -244,7 +271,7 @@ function setField(lines, prefix, f, val) {
           )
         }
       } else if (isString) {
-        lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+        lines.push(`    orig.${fullPath} = ${strView(wireStr(base, val))};`)
       } else {
         lines.push(`    orig.${fullPath} = ${lit(val)};`)
       }
@@ -256,12 +283,12 @@ function setField(lines, prefix, f, val) {
       throw new Error(`fixture has null value for required field '${f.name}' at '${prefix}'`)
     }
     if (isFixed) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       lines.push(
         `    { static const uint8_t _b[] = {${[...bytes]}}; memcpy(orig.${fullPath}, _b, sizeof(_b)); }`
       )
     } else if (isBuffer) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       if (bytes.length === 0) {
         lines.push(`    orig.${fullPath} = (uint8_t *)""; orig.${fullPath}_len = 0;`)
       } else {
@@ -270,7 +297,7 @@ function setField(lines, prefix, f, val) {
         )
       }
     } else if (isString) {
-      lines.push(`    orig.${fullPath} = ${strView(toStr(val))};`)
+      lines.push(`    orig.${fullPath} = ${strView(wireStr(base, val))};`)
     } else {
       lines.push(`    orig.${fullPath} = ${lit(val)};`)
     }
@@ -337,20 +364,26 @@ function compareField(lines, prefix, f, val) {
     return
   }
 
+  // A scalar bool is a flag bit: the decoded value is the bit, no has_.
+  if (base.name === 'bool') {
+    lines.push(`    assert(dec.${fullPath} == ${val ? 'true' : 'false'});`)
+    return
+  }
+
   const info = typeInfo(base.name)
   const isFixed = fixedSize(base.name) > 0
   const { isBuffer, isString } = info
   const lit = makeLit(info)
 
   if (!f.required) {
-    if (val !== null && val !== undefined) {
+    if (jsTruthy(val)) {
       lines.push(`    assert(dec.${prefix}has_${cField} == true);`)
       if (isFixed) {
         lines.push(
           `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
         )
       } else if (isBuffer) {
-        const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+        const bytes = toBytes(val)
         lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
         if (bytes.length > 0) {
           lines.push(
@@ -358,7 +391,7 @@ function compareField(lines, prefix, f, val) {
           )
         }
       } else if (isString) {
-        const len = Buffer.byteLength(String(val), 'utf8')
+        const len = Buffer.byteLength(wireStr(base, val), 'utf8')
         lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
         if (len > 0) {
           lines.push(
@@ -377,7 +410,7 @@ function compareField(lines, prefix, f, val) {
         `    assert(memcmp(dec.${fullPath}, orig.${fullPath}, sizeof(dec.${fullPath})) == 0);`
       )
     } else if (isBuffer) {
-      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val)
+      const bytes = toBytes(val)
       lines.push(`    assert(dec.${fullPath}_len == orig.${fullPath}_len);`)
       if (bytes.length > 0) {
         lines.push(
@@ -385,7 +418,7 @@ function compareField(lines, prefix, f, val) {
         )
       }
     } else if (isString) {
-      const len = Buffer.byteLength(String(val), 'utf8')
+      const len = Buffer.byteLength(wireStr(base, val), 'utf8')
       lines.push(`    assert(dec.${fullPath}.len == orig.${fullPath}.len);`)
       if (len > 0) {
         lines.push(
