@@ -46,9 +46,9 @@ for (const fix of fixtures) {
   const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
   const firstVal = testData.values[0]
   const pt = primaryType(schema)
-  // The record heuristic only applies to struct/versioned roots; an array root
-  // has no named fields to match against.
-  if (!pt.isArray) {
+  // Array and record roots have no named fields to match against; the heuristic
+  // only guards struct/versioned roots.
+  if (!pt.isArray && !pt.isRecord) {
     const fieldNames = new Set(
       pt.isVersioned
         ? pt.versions.flatMap((d) => d.type.fields.map((f) => f.name))
