@@ -182,13 +182,15 @@ function versionDef(type, value) {
 function setVersioned(lines, type, value) {
   const def = versionDef(type, value)
   lines.push(`    orig.version = ${value.version}ULL;`)
-  for (const f of def.type.fields) setField(lines, `u.v${def.version}.`, f, value[f.name])
+  const struct = resolveBase(def.type)
+  for (const f of struct.fields) setField(lines, `u.v${def.version}.`, f, value[f.name])
 }
 
 function compareVersioned(lines, type, value) {
   const def = versionDef(type, value)
   lines.push(`    assert(dec.version == ${value.version}ULL);`)
-  for (const f of def.type.fields) compareField(lines, `u.v${def.version}.`, f, value[f.name])
+  const struct = resolveBase(def.type)
+  for (const f of struct.fields) compareField(lines, `u.v${def.version}.`, f, value[f.name])
 }
 
 function setField(lines, prefix, f, val) {
