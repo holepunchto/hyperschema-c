@@ -168,9 +168,70 @@ function enumConst(type, val) {
 
 function primaryType(schema) {
   const types = [...schema.types.values()].filter(
-    (t) => (t.isStruct && t.fields.length > 0) || t.isVersioned || t.isArray
+    (t) => (t.isStruct && t.fields.length > 0) || t.isVersioned || t.isArray || t.isRecord
   )
   return types[types.length - 1]
+}
+
+// A record value is a JS object; populate the parallel { keys, values, len }
+// arrays in Object.keys order (the wire order the JS reference produces).
+function setRecord(lines, type, value) {
+  const valBase = resolveBase(type.value)
+  const keys = Object.keys(value)
+  if (keys.length === 0) {
+    lines.push(`    orig.keys = NULL; orig.values = NULL; orig.len = 0;`)
+    return
+  }
+  lines.push(`    static utf8_string_view_t _keys[] = {${keys.map((k) => strView(k)).join(', ')}};`)
+  lines.push(`    orig.keys = _keys; orig.len = ${keys.length};`)
+  if (valBase.isStruct) {
+    lines.push(
+      `    static ${structName(valBase)}_t _vals[${keys.length}]; memset(_vals, 0, sizeof(_vals));`
+    )
+    lines.push(`    orig.values = _vals;`)
+    for (let i = 0; i < keys.length; i++) {
+      for (const sf of valBase.fields) setField(lines, `values[${i}].`, sf, value[keys[i]][sf.name])
+    }
+    return
+  }
+  const info = typeInfo(valBase.name)
+  const elems = keys
+    .map((k) => (info.isString ? strView(toStr(value[k])) : makeLit(info)(value[k])))
+    .join(', ')
+  const cType = info.isString ? 'utf8_string_view_t' : info.cType
+  lines.push(`    static ${cType} _vals[] = {${elems}};`)
+  lines.push(`    orig.values = _vals;`)
+}
+
+function compareRecord(lines, type, value) {
+  const valBase = resolveBase(type.value)
+  const keys = Object.keys(value)
+  lines.push(`    assert(dec.len == ${keys.length});`)
+  for (let i = 0; i < keys.length; i++) {
+    lines.push(`    assert(dec.keys[${i}].len == orig.keys[${i}].len);`)
+    if (Buffer.byteLength(keys[i], 'utf8') > 0) {
+      lines.push(
+        `    assert(memcmp(dec.keys[${i}].data, orig.keys[${i}].data, orig.keys[${i}].len) == 0);`
+      )
+    }
+    if (valBase.isStruct) {
+      for (const sf of valBase.fields) {
+        compareField(lines, `values[${i}].`, sf, value[keys[i]][sf.name])
+      }
+      continue
+    }
+    const info = typeInfo(valBase.name)
+    if (info.isString) {
+      lines.push(`    assert(dec.values[${i}].len == orig.values[${i}].len);`)
+      if (Buffer.byteLength(toStr(value[keys[i]]), 'utf8') > 0) {
+        lines.push(
+          `    assert(memcmp(dec.values[${i}].data, orig.values[${i}].data, orig.values[${i}].len) == 0);`
+        )
+      }
+    } else {
+      lines.push(`    assert(dec.values[${i}] == ${makeLit(info)(value[keys[i]])});`)
+    }
+  }
 }
 
 // A top-level array value is a JS array; populate the { values, len } struct.
@@ -520,6 +581,7 @@ function generateRoundTrip(name, type, testValue, exp) {
   lines.push(`    memset(&orig, 0, sizeof(orig));`)
   if (type.isVersioned) setVersioned(lines, type, testValue)
   else if (type.isArray) setArray(lines, type, testValue)
+  else if (type.isRecord) setRecord(lines, type, testValue)
   else for (const f of type.fields) setField(lines, '', f, testValue[f.name])
   lines.push(`    compact_state_t st = {0, 0};`)
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
@@ -545,6 +607,7 @@ function generateRoundTrip(name, type, testValue, exp) {
   }
   if (type.isVersioned) compareVersioned(lines, type, testValue)
   else if (type.isArray) compareArray(lines, type, testValue)
+  else if (type.isRecord) compareRecord(lines, type, testValue)
   else for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`    ${name}_destroy(&dec);`)
