@@ -45,15 +45,18 @@ for (const fix of fixtures) {
 
   const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
   const firstVal = testData.values[0]
-  if (Array.isArray(firstVal)) continue // array-alias fixture
   const pt = primaryType(schema)
-  const fieldNames = new Set(
-    pt.isVersioned
-      ? pt.versions.flatMap((d) => d.type.fields.map((f) => f.name))
-      : pt.fields.map((f) => f.name)
-  )
-  const valKeys = Object.keys(firstVal)
-  if (valKeys.length > 0 && !valKeys.some((k) => fieldNames.has(k))) continue // record/map fixture
+  // The record heuristic only applies to struct/versioned roots; an array root
+  // has no named fields to match against.
+  if (!pt.isArray) {
+    const fieldNames = new Set(
+      pt.isVersioned
+        ? pt.versions.flatMap((d) => d.type.fields.map((f) => f.name))
+        : pt.fields.map((f) => f.name)
+    )
+    const valKeys = Object.keys(firstVal)
+    if (valKeys.length > 0 && !valKeys.some((k) => fieldNames.has(k))) continue // record/map fixture
+  }
 
   test(`fixture ${fix} - compile and round-trip`, (t) => {
     const result = runC(schema, generateMainC(schema, fixtureDir))
