@@ -10,8 +10,7 @@ const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/pac
 // for reasons outside this generator. Skipped loudly rather than silently so the
 // suite never reads as "everything passes" when it does not.
 const BLOCKED = {
-  42: 'libcompact int56 zig-zag diverges from JS at -(2^53 - 1)',
-  26: 'versioned types are not generated yet (follow-up PR)'
+  42: 'libcompact int56 zig-zag diverges from JS at -(2^53 - 1)'
 }
 
 const fixtures = fs
@@ -47,7 +46,12 @@ for (const fix of fixtures) {
   const testData = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'test.json'), 'utf8'))
   const firstVal = testData.values[0]
   if (Array.isArray(firstVal)) continue // array-alias fixture
-  const fieldNames = new Set(primaryType(schema).fields.map((f) => f.name))
+  const pt = primaryType(schema)
+  const fieldNames = new Set(
+    pt.isVersioned
+      ? pt.versions.flatMap((d) => d.type.fields.map((f) => f.name))
+      : pt.fields.map((f) => f.name)
+  )
   const valKeys = Object.keys(firstVal)
   if (valKeys.length > 0 && !valKeys.some((k) => fieldNames.has(k))) continue // record/map fixture
 

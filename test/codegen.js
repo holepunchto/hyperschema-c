@@ -633,3 +633,23 @@ test('string enum - same uint wire format as numeric', (t) => {
   t.ok(header.includes('NS22_STATUS_PENDING = 1'), 'string enum is still numeric in C')
   t.ok(source.includes('compact_encode_uint(state, (uint64_t)value->status)'), 'encode via uint')
 })
+
+test('versioned type - tagged union header', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '26'))
+  const { header } = schema.toCode()
+
+  t.ok(header.includes('typedef struct ns26_message_s {'), 'versioned typedef')
+  t.ok(header.includes('uint64_t version;'), 'version tag')
+  t.ok(header.includes('ns26_msg_v0_t v0;'), 'v0 union member')
+  t.ok(header.includes('ns26_msg_v1_t v1;'), 'v1 union member')
+  t.ok(header.includes('} u;'), 'union member named u')
+})
+
+test('versioned type - encode writes version then dispatches by version', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '26'))
+  const { source } = schema.toCode()
+
+  t.ok(source.includes('compact_encode_uint(state, value->version)'), 'version written first')
+  t.ok(source.includes('ns26_msg_v0_encode(state, &value->u.v0)'), 'dispatches v0 on encode')
+  t.ok(source.includes('ns26_msg_v1_decode(state, &result->u.v1)'), 'dispatches v1 on decode')
+})
