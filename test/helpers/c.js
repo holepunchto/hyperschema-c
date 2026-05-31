@@ -168,9 +168,58 @@ function enumConst(type, val) {
 
 function primaryType(schema) {
   const types = [...schema.types.values()].filter(
-    (t) => (t.isStruct && t.fields.length > 0) || t.isVersioned
+    (t) => (t.isStruct && t.fields.length > 0) || t.isVersioned || t.isArray
   )
   return types[types.length - 1]
+}
+
+// A top-level array value is a JS array; populate the { values, len } struct.
+// setField is reused for struct elements via the `values[i].` path prefix.
+function setArray(lines, type, value) {
+  const base = resolveBase(type.type)
+  if (value.length === 0) {
+    lines.push(`    orig.values = NULL; orig.len = 0;`)
+    return
+  }
+  if (base.isStruct) {
+    lines.push(
+      `    static ${structName(base)}_t _arr[${value.length}]; memset(_arr, 0, sizeof(_arr));`
+    )
+    lines.push(`    orig.values = _arr; orig.len = ${value.length};`)
+    for (let i = 0; i < value.length; i++) {
+      for (const sf of base.fields) setField(lines, `values[${i}].`, sf, value[i][sf.name])
+    }
+    return
+  }
+  const info = typeInfo(base.name)
+  const elems = value.map((v) => (info.isString ? strView(toStr(v)) : makeLit(info)(v))).join(', ')
+  const cType = info.isString ? 'utf8_string_view_t' : info.cType
+  lines.push(`    static ${cType} _arr[] = {${elems}};`)
+  lines.push(`    orig.values = _arr; orig.len = ${value.length};`)
+}
+
+function compareArray(lines, type, value) {
+  const base = resolveBase(type.type)
+  lines.push(`    assert(dec.len == ${value.length});`)
+  if (base.isStruct) {
+    for (let i = 0; i < value.length; i++) {
+      for (const sf of base.fields) compareField(lines, `values[${i}].`, sf, value[i][sf.name])
+    }
+    return
+  }
+  const info = typeInfo(base.name)
+  for (let i = 0; i < value.length; i++) {
+    if (info.isString) {
+      lines.push(`    assert(dec.values[${i}].len == orig.values[${i}].len);`)
+      if (Buffer.byteLength(toStr(value[i]), 'utf8') > 0) {
+        lines.push(
+          `    assert(memcmp(dec.values[${i}].data, orig.values[${i}].data, orig.values[${i}].len) == 0);`
+        )
+      }
+    } else {
+      lines.push(`    assert(dec.values[${i}] == ${makeLit(info)(value[i])});`)
+    }
+  }
 }
 
 // A versioned test value is a flat struct value plus a `version` selector; pick
@@ -470,6 +519,7 @@ function generateRoundTrip(name, type, testValue, exp) {
   lines.push(`    ${name}_t orig;`)
   lines.push(`    memset(&orig, 0, sizeof(orig));`)
   if (type.isVersioned) setVersioned(lines, type, testValue)
+  else if (type.isArray) setArray(lines, type, testValue)
   else for (const f of type.fields) setField(lines, '', f, testValue[f.name])
   lines.push(`    compact_state_t st = {0, 0};`)
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
@@ -494,6 +544,7 @@ function generateRoundTrip(name, type, testValue, exp) {
     lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
   }
   if (type.isVersioned) compareVersioned(lines, type, testValue)
+  else if (type.isArray) compareArray(lines, type, testValue)
   else for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`    ${name}_destroy(&dec);`)
