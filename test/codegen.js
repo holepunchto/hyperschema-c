@@ -678,3 +678,24 @@ test('array-only schema derives target from the array namespace', (t) => {
   const schema = CHyperschema.from(path.join(fixturesDir, '6'))
   t.is(targetName(schema), 'ns6_schema')
 })
+
+test('top-level record - parallel key/value arrays', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '23'))
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('typedef struct ns23_scores_s {'), 'record typedef')
+  t.ok(header.includes('utf8_string_view_t *keys;'), 'string keys array')
+  t.ok(header.includes('uint64_t *values;'), 'uint values array')
+  t.ok(source.includes('compact_encode_utf8(state, value->keys[_i])'), 'key encode')
+  t.ok(source.includes('compact_encode_uint(state, value->values[_i])'), 'value encode')
+})
+
+test('record with struct values - dispatches to value codec and frees both arrays', (t) => {
+  const schema = CHyperschema.from(path.join(fixturesDir, '24'))
+  const { header, source } = schema.toCode()
+
+  t.ok(header.includes('ns24_entry_t *values;'), 'struct values array')
+  t.ok(source.includes('ns24_entry_encode(state, &value->values[_i])'), 'struct value encode')
+  t.ok(source.includes('free(result->keys)'), 'frees keys')
+  t.ok(source.includes('free(result->values)'), 'frees values')
+})
