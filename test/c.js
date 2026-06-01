@@ -10,7 +10,7 @@ const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/pac
 // for reasons outside this generator. Skipped loudly rather than silently so the
 // suite never reads as "everything passes" when it does not.
 const BLOCKED = {
-  42: 'libcompact int56 zig-zag diverges from JS at -(2^53 - 1)',
+  42: 'canonical vector is wrong: compact-encoding misrounds the int56 zig-zag at -(2^53 - 1) (holepunchto/compact-encoding#52); our C output is correct',
   26: 'versioned types are not generated yet (follow-up PR)'
 }
 
