@@ -167,8 +167,30 @@ function enumConst(type, val) {
 }
 
 function primaryType(schema) {
-  const structs = [...schema.types.values()].filter((t) => t.isStruct && t.fields.length > 0)
-  return structs[structs.length - 1]
+  const types = [...schema.types.values()].filter(
+    (t) => (t.isStruct && t.fields.length > 0) || t.isVersioned
+  )
+  return types[types.length - 1]
+}
+
+// A versioned test value is a flat struct value plus a `version` selector; pick
+// the declared version it targets (fixture values use exact declared versions).
+function versionDef(type, value) {
+  return type.versions.find((d) => d.version === value.version)
+}
+
+function setVersioned(lines, type, value) {
+  const def = versionDef(type, value)
+  lines.push(`    orig.version = ${value.version}ULL;`)
+  const struct = resolveBase(def.type)
+  for (const f of struct.fields) setField(lines, `u.v${def.version}.`, f, value[f.name])
+}
+
+function compareVersioned(lines, type, value) {
+  const def = versionDef(type, value)
+  lines.push(`    assert(dec.version == ${value.version}ULL);`)
+  const struct = resolveBase(def.type)
+  for (const f of struct.fields) compareField(lines, `u.v${def.version}.`, f, value[f.name])
 }
 
 function setField(lines, prefix, f, val) {
@@ -447,7 +469,8 @@ function generateRoundTrip(name, type, testValue, exp) {
   lines.push(`  {`)
   lines.push(`    ${name}_t orig;`)
   lines.push(`    memset(&orig, 0, sizeof(orig));`)
-  for (const f of type.fields) setField(lines, '', f, testValue[f.name])
+  if (type.isVersioned) setVersioned(lines, type, testValue)
+  else for (const f of type.fields) setField(lines, '', f, testValue[f.name])
   lines.push(`    compact_state_t st = {0, 0};`)
   lines.push(`    err = ${name}_preencode(&st, &orig); assert(err == 0);`)
   lines.push(`    st.buffer = malloc(st.end);`)
@@ -470,7 +493,8 @@ function generateRoundTrip(name, type, testValue, exp) {
     lines.push(`    st.start = 0;`)
     lines.push(`    err = ${name}_decode(&st, &dec); assert(err == 0);`)
   }
-  for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
+  if (type.isVersioned) compareVersioned(lines, type, testValue)
+  else for (const f of type.fields) compareField(lines, '', f, testValue[f.name])
   lines.push(`    free(st.buffer);`)
   lines.push(`    ${name}_destroy(&dec);`)
   lines.push(`  }`)
