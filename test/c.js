@@ -8,10 +8,8 @@ const fixturesDir = path.join(path.dirname(require.resolve('hyperschema-test/pac
 
 // Fixtures that generate correct C but cannot yet pass the canonical byte check,
 // for reasons outside this generator. Skipped loudly rather than silently so the
-// suite never reads as "everything passes" when it does not.
-const BLOCKED = {
-  42: 'canonical vector is wrong: compact-encoding misrounds the int56 zig-zag at -(2^53 - 1) (holepunchto/compact-encoding#52); our C output is correct'
-}
+// suite never reads as "everything passes" when it does not. Currently empty.
+const BLOCKED = {}
 
 const fixtures = fs
   .readdirSync(fixturesDir)
